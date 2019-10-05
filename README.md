@@ -1,4 +1,4 @@
-# itfp_repo
+# IDENTIFICATION OF FINGERPRINTS FLAT REPOSITORY
 
 Fingerprint identification and verification algorithm
 
