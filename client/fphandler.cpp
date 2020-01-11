@@ -47,7 +47,6 @@ void FpHandler::startScan()
     CHECK_ERROR(errorCode, false);
     errorCode = UFS_GetCaptureImageBuffer(scanner, capture.data());
     CHECK_ERROR(errorCode, false);
-    qDebug() << capture.size();
 }
 
 QByteArray FpHandler::getScanData()

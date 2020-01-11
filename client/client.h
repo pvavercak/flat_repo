@@ -5,7 +5,7 @@
 #include <QObject>
 #include <QTcpSocket>
 #include <QHostAddress>
-
+#define SOCKETSIZE 65000.0
 class Client : public QObject
 {
     Q_OBJECT
@@ -14,7 +14,8 @@ public:
     explicit Client(QObject *parent = nullptr);
     bool checkIp(QString &receivedIp, quint16 receivedPort);
     bool isSocketConnected();
-    void writeMessage(QByteArray& bytesToWrite);
+    void writeTemplate(QByteArray& bytesToWrite);
+    bool writeHeader(QByteArray& headerToWrite, int len);
 
 signals:
     void connected();

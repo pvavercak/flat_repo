@@ -1,5 +1,7 @@
 #include "client.h"
 #include <regex>
+#include <QDataStream>
+
 Client::Client(QObject *parent) :
     QObject(parent),
     m_socket(new QTcpSocket(this))
@@ -23,17 +25,46 @@ bool Client::isSocketConnected(){
     return false;
 }
 
-void Client::writeMessage(QByteArray &bytesToWrite)
+void Client::writeTemplate(QByteArray &bytesToWrite)
 {
-    QByteArray enter{bytesToWrite};
-    //enter.append(QString("\n").toUtf8());
-    int written = (int)m_socket->write(enter);
-    m_socket->waitForBytesWritten(3000);
-    if(enter.size() == written){
-        qDebug() << "all the data sent";
-    } else {
-        qDebug() << "not all the data were sent...";
+    int repeat{(int) static_cast<double>(bytesToWrite.size())/SOCKETSIZE};
+    qDebug() << bytesToWrite.toBase64();
+    for(int i = 0; i != 1 + repeat; ++i){
+        std::unique_ptr<QTcpSocket> temp{std::unique_ptr<QTcpSocket>(new QTcpSocket())};
+        temp.get()->connectToHost(address, port);
+        if((i + 1) * SOCKETSIZE < bytesToWrite.size()){
+            //qDebug() << bytesToWrite.mid(i*SOCKETSIZE, (i +1) * SOCKETSIZE);
+            qDebug() << "Bytes sent in " << i << " iteration: "<< temp.get()->write(bytesToWrite.mid(i*SOCKETSIZE, SOCKETSIZE));
+            temp.get()->waitForBytesWritten(300000);
+        } else {
+            //qDebug() << bytesToWrite.mid(i*SOCKETSIZE, bytesToWrite.size() - i *SOCKETSIZE);
+            qDebug() << "Bytes sent in " << i << " iteration: "<< temp.get()->write(bytesToWrite.mid(i*SOCKETSIZE, bytesToWrite.size() - i * SOCKETSIZE));
+            temp.get()->waitForBytesWritten(300000);
+        }
+        temp.get()->close();
+        if(!temp.get()->isOpen()){
+            qDebug() << "Temporary socket disconnection successful";
+        } else {
+            qDebug() << "Error when disconnecting temporary socket";
+        }
     }
+}
+
+bool Client::writeHeader(QByteArray &headerToWrite, int len)
+{
+    int writeLen = (int)(m_socket.get()->write(headerToWrite));
+    m_socket.get()->waitForBytesWritten();
+    if(len != writeLen){
+        return false;
+    }
+    m_socket.get()->disconnectFromHost();
+    m_socket.get()->close();
+    if(!m_socket.get()->isOpen()){
+        qDebug() << "Header sent and socket closed";
+    } else {
+        qDebug() << "Error in header sending";
+    }
+    return true;
 }
 
 void Client::disconnectFromHost()
