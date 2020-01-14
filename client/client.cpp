@@ -7,14 +7,14 @@ Client::Client(QObject *parent) :
     m_socket(new QTcpSocket(this))
 
 {
-    connect(m_socket.get(), &QTcpSocket::connected, this, &Client::connected);
+    connect(m_socket.get(), &QTcpSocket::connected, this, &Client::onConnectedToServer);
     //connect(m_socket.get(), &QTcpSocket::disconnected, this, &Client::disconnected);
     connect(m_socket.get(), &QTcpSocket::readyRead, this, &Client::onReadyRead);
 }
 
 void Client::connectToServer()
 {
-    m_socket->abort();
+    //m_socket->abort();
     m_socket->connectToHost(address, port);
 }
 
@@ -75,6 +75,12 @@ void Client::disconnectFromHost()
 
 void Client::onReadyRead(){
     qDebug() << "on ready read";
+}
+
+void Client::onConnectedToServer()
+{
+    qDebug() << "Client: connected";
+    //connectToServer();
 }
 
 bool Client::checkIp(QString &receivedIp, quint16 receivedPort)

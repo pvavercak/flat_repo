@@ -2,6 +2,7 @@
 #include <iostream>
 #include <QDataStream>
 #include <sstream>
+#include <QAbstractSocket>
 
 Server::Server(QObject *parent) :
     QObject(parent),
@@ -23,10 +24,6 @@ void Server::initialize(QHostAddress address, quint16 port)
     if(this->m_server.get()->isListening()){
         emit updateLog("server is already listening");
     } else if (this->m_server.get()->listen(address, port)) {
-        m_socket.get()->abort();
-        //this->m_socket.get()->connectToHost(address, port);
-        connect(this->m_socket.get(), SIGNAL(readyRead()), this, SLOT(onReadyRead()));
-        connect(this->m_socket.get(), &QTcpSocket::disconnected, this, &Server::disconnectedClient);
         emit updateLog("server runs now...");
         if (m_db.get()->setDb()){
             emit updateLog("database connected");
@@ -54,7 +51,15 @@ void Server::newConnection()
 {
     if(this->m_server.get()->hasPendingConnections()){
         this->m_socket = std::shared_ptr<QTcpSocket>(this->m_server.get()->nextPendingConnection());
-        connect(this->m_socket.get(), &QAbstractSocket::readyRead, this, &Server::receivedMessage);
+        qDebug() << m_socket.get()->state();
+        connect(m_socket.get(), &QAbstractSocket::readyRead, this, &Server::receivedMessage);
+        connect(m_socket.get(), &QAbstractSocket::connected, this, &Server::connectedClient);
+        connect(m_socket.get(), SIGNAL(stateChanged(QAbstractSocket::SocketState)), this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
+//        connect(this->m_socket.get(), SIGNAL(readyRead()), this, SLOT(onReadyRead()));
+        connect(this->m_socket.get(), SIGNAL(disconnected()), this, SLOT(disconnectedClient()));
+//        connect(this->m_socket.get(), SIGNAL(connected()), this, SLOT(connectedClient()));
+//        connect(this->m_socket.get(), SIGNAL(stateChanged(QAbstractSocket::SocketState)), this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
+//        connect(this->m_socket.get(), SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(onError(QAbstractSocket::SocketError)));
     }
     if(!this->m_socket.get()->open(QIODevice::ReadOnly)){
         emit updateLog("error during setting a readonly mode...");
@@ -64,6 +69,7 @@ void Server::newConnection()
 void Server::onReadyRead()
 {
     QByteArray r = qobject_cast<QTcpSocket*>(sender())->readAll();
+    qDebug() << r.size();
 }
 
 int Server::processHeader(QByteArray& header)
@@ -87,9 +93,10 @@ void Server::clearAndSaveTemplate()
     if(m_expectedSize == m_receivedTemplate.get()->size()){
         m_expectedSize = 0;
         qDebug() << m_receivedTemplate.get()->toBase64();
-        qDebug() << m_db.get()->writeTemplate(m_receivedTemplate.get()->toBase64());
+        //qDebug() << m_db.get()->writeTemplate(m_receivedTemplate.get()->toBase64());
         m_receivedTemplate.get()->clear();
     }
+    qDebug() << m_receivedTemplate.get()->size();
 }
 
 void Server::receivedMessage()
@@ -98,17 +105,28 @@ void Server::receivedMessage()
     if(processHeader(r) != -1) this->m_expectedSize = processHeader(r);
     else{
         m_receivedTemplate.get()->append(r);
-        //qDebug() << r;
     }
 
     clearAndSaveTemplate();
-//    QByteArray r = qobject_cast<QTcpSocket*>(sender())->readAll();
-//    QDataStream rData(r);
-//    qDebug() << r.size() << "bytes";
-//    emit updateLog("template received");
 }
 
 void Server::disconnectedClient()
 {
     emit updateLog("Client disconnected");
+}
+
+void Server::connectedClient()
+{
+    qDebug() << m_socket.get()->peerAddress();
+    qDebug() << m_socket.get()->peerPort();
+}
+
+void Server::onStateChanged(QAbstractSocket::SocketState state)
+{
+    qDebug() << "Status: " << state;
+}
+
+void Server::onError(QAbstractSocket::SocketError error)
+{
+    qDebug() << "Error: " << error;
 }

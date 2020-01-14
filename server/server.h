@@ -18,6 +18,7 @@ private:
     std::vector<QTcpSocket*> m_socket_list;
     int m_expectedSize;
     std::shared_ptr<QByteArray> m_receivedTemplate;
+    QByteArray m_receivedTemplate2;
     std::shared_ptr<DatabaseConnection> m_db;
     int processHeader(QByteArray& header);
     void clearAndSaveTemplate();
@@ -31,6 +32,9 @@ private slots:
     void onReadyRead();
     void receivedMessage();
     void disconnectedClient();
+    void connectedClient();
+    void onStateChanged(QAbstractSocket::SocketState state);
+    void onError(QAbstractSocket::SocketError error);
 signals:
     void updateLog(QString log);
 

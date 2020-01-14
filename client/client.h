@@ -29,6 +29,7 @@ public slots:
     void disconnectFromHost();
 private slots:
         void onReadyRead();
+        void onConnectedToServer();
 private:
     QHostAddress address;
     quint16 port;

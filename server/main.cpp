@@ -46,7 +46,7 @@ int main(int argc, char *argv[])
 
 
 //    QSqlDatabase db = QSqlDatabase::addDatabase("QSQLITE");
-//    db.setDatabaseName("/home/pva/SCHOOL/testDatabase.db");
+//    db.setDatabaseName("/home/pva/SCHOOL/database.sqlite");
 //    if(db.open()){
 //        qDebug() << "all ok";
 //    }
@@ -54,7 +54,21 @@ int main(int argc, char *argv[])
 //        qDebug() << "sth went wrong";
 //    }
 
-//    QSqlQuery qry;
-//    qry.exec("update stored_users set name = 'Pvavercak' where id = 1");
+//    QSqlQueryModel qModel;
+//    qModel.setQuery("CREATE TABLE registered_users(id int(1000) NOT NULL UNIQUE, template MEDIUMBLOB);");
+//    check_query(qModel);
+//    QByteArray testData("this is a test");
+//    QSqlQuery qry("INSERT INTO registered_users (id, template) VALUES (:userid," + testData + ");");
+//    qry.bindValue(":userid", 5);
+//    qry.bindValue(":data", testData);
+//    qModel.setQuery(qry);
+//    check_query(qModel);
+
+    QByteArray f("abc");
+    QByteArray b("defgh");
+    //f += b;
+    f.append(b);
+    qDebug() << f.size();
+
     return a.exec();
 }

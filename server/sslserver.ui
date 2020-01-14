@@ -51,7 +51,7 @@
             <item>
              <widget class="QLineEdit" name="input_port">
               <property name="text">
-               <string>4040</string>
+               <string>55533</string>
               </property>
              </widget>
             </item>

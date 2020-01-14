@@ -20,7 +20,7 @@ SSLServer::~SSLServer()
 void SSLServer::on_run_pressed()
 {
     //this->console.get()->append("S");
-    this->m_server.get()->initialize(QHostAddress::LocalHost, 4040);
+    this->m_server.get()->initialize(QHostAddress("127.0.0.1"), 55533);
 }
 
 void SSLServer::on_clear_pressed()
