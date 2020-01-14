@@ -16,18 +16,18 @@ int main(int argc, char *argv[])
     QApplication a(argc, argv);
     SSLServer w;
     w.show();
-    QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
-    db.setHostName("localhost");
-    db.setUserName("pva");
-    db.setPassword("");
+//    QSqlDatabase db = QSqlDatabase::addDatabase("QMYSQL");
+//    db.setHostName("localhost");
+//    db.setUserName("pva");
+//    db.setPassword("");
 
-    if(db.open()){
-        qDebug() << "all ok";
-    }
-    else{
-        qDebug() << db.lastError();
-        qDebug() << "sth went wrong";
-    }
+//    if(db.open()){
+//        qDebug() << "all ok";
+//    }
+//    else{
+//        qDebug() << db.lastError();
+//        qDebug() << "sth went wrong";
+//    }
 
 //    QSqlQueryModel model;
 //    model.setQuery("CREATE DATABASE test_database;");

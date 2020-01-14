@@ -6,6 +6,8 @@
 #include <vector>
 #include <string>
 #include <QSqlDatabase>
+#include "connection.h"
+#include <QSqlQuery>
 
 class Server : public QObject
 {
@@ -16,6 +18,7 @@ private:
     std::vector<QTcpSocket*> m_socket_list;
     int m_expectedSize;
     std::shared_ptr<QByteArray> m_receivedTemplate;
+    std::shared_ptr<DatabaseConnection> m_db;
     int processHeader(QByteArray& header);
     void clearAndSaveTemplate();
 public:

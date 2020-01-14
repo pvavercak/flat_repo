@@ -9,10 +9,12 @@ Server::Server(QObject *parent) :
 {
     m_server = std::unique_ptr<QTcpServer>(new QTcpServer());
     m_socket = std::shared_ptr<QTcpSocket>(new QTcpSocket());
+    m_db = std::shared_ptr<DatabaseConnection>(new DatabaseConnection());
     m_receivedTemplate = std::shared_ptr<QByteArray>(new QByteArray);
 }
 
-Server::~Server() {
+Server::~Server()
+{
 
 }
 
@@ -26,6 +28,11 @@ void Server::initialize(QHostAddress address, quint16 port)
         connect(this->m_socket.get(), SIGNAL(readyRead()), this, SLOT(onReadyRead()));
         connect(this->m_socket.get(), &QTcpSocket::disconnected, this, &Server::disconnectedClient);
         emit updateLog("server runs now...");
+        if (m_db.get()->setDb()){
+            emit updateLog("database connected");
+        } else {
+            emit updateLog("Warning: database not connected!");
+        }
     } else {
         emit updateLog("could not start a server");
     }
@@ -56,9 +63,7 @@ void Server::newConnection()
 
 void Server::onReadyRead()
 {
-
     QByteArray r = qobject_cast<QTcpSocket*>(sender())->readAll();
-
 }
 
 int Server::processHeader(QByteArray& header)
@@ -81,9 +86,8 @@ void Server::clearAndSaveTemplate()
 {
     if(m_expectedSize == m_receivedTemplate.get()->size()){
         m_expectedSize = 0;
-        //emit updateLog("final size: " + m_receivedTemplate.get()->size());
-        //qDebug() << "final size: "<< m_receivedTemplate.get()->size();
         qDebug() << m_receivedTemplate.get()->toBase64();
+        qDebug() << m_db.get()->writeTemplate(m_receivedTemplate.get()->toBase64());
         m_receivedTemplate.get()->clear();
     }
 }
