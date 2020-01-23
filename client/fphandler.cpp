@@ -43,6 +43,8 @@ QString FpHandler::getErrorMessage()
 
 void FpHandler::startScan()
 {
+    capture.clear();
+    capture.resize(320*480);
     errorCode = UFS_CaptureSingleImage(scanner);
     CHECK_ERROR(errorCode, false);
     errorCode = UFS_GetCaptureImageBuffer(scanner, capture.data());
@@ -51,7 +53,30 @@ void FpHandler::startScan()
 
 QByteArray FpHandler::getScanData()
 {
-    return QByteArray(reinterpret_cast<char*>(capture.data()), capture.size());
+    return QByteArray(getScanDataInternal(), static_cast<int>(capture.size()));
+}
+
+const char* FpHandler::getScanDataInternal()
+{
+    prependScannedDataSize(static_cast<int>(capture.size()));
+    return reinterpret_cast<const char*>(capture.data());
+}
+
+void FpHandler::prependScannedDataSize(int dataSize)
+{
+    int cipherCount{0};
+    while (dataSize != 0) {
+        capture.insert(capture.begin(), static_cast<unsigned char>(dataSize % 10));
+        dataSize = dataSize / 10;
+        ++cipherCount;
+    }
+    if(HEADERSIZE > cipherCount) {
+        for(int i = 0; i < (HEADERSIZE - cipherCount); ++i) {
+            //insert '>' to header to make sure it has the exact lenght
+            capture.insert(capture.begin(), static_cast<unsigned char>(62));
+        }
+    }
+    return;
 }
 
 bool FpHandler::CHECK_ERROR(UFS_STATUS err, bool exitOnFailure){

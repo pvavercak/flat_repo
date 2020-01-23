@@ -1,8 +1,9 @@
-#include "sslserver.h"
+#include "servergui.h"
 #include <QApplication>
 #include <QSqlQuery>
 #include <QSqlQueryModel>
 #include <QSqlError>
+#include <sstream>
 
 void check_query(QSqlQueryModel &model){
     if (model.lastError().isValid())
@@ -64,11 +65,24 @@ int main(int argc, char *argv[])
 //    qModel.setQuery(qry);
 //    check_query(qModel);
 
-    QByteArray f("abc");
-    QByteArray b("defgh");
-    //f += b;
-    f.append(b);
-    qDebug() << f.size();
+//    QByteArray f("abc");
+//    QByteArray b("defgh");
+//    //f += b;
+//    f.append(b);
+//    qDebug() << f.size();
+    QByteArray f(">>>>153600");
+    std::stringstream ss;
+    for (auto& i : f) {
+        if (static_cast<unsigned char>(62) != i) {
+            ss << static_cast<unsigned char>(i);
+        }
+    }
+    std::string str = ss.str();
+    for (auto& a : str) {
+//        qDebug() << a;
+    }
+    int lala = atoi(str.c_str());
+//    qDebug() << lala;
 
     return a.exec();
 }

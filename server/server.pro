@@ -6,14 +6,14 @@ DEFINES += QT_DEPRECATED_WARNINGS
 
 SOURCES += \
         main.cpp \
-        sslserver.cpp \
         server.cpp \
-    connection.cpp
+    connection.cpp \
+    servergui.cpp
 
 HEADERS += \
-        sslserver.h \
     server.h \
-    connection.h
+    connection.h \
+    servergui.h
 
 FORMS += \
         sslserver.ui

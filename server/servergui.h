@@ -6,8 +6,9 @@
 #include <memory>
 #include "server.h"
 
-namespace Ui {
-class SSLServer;
+namespace Ui
+{
+    class SSLServer;
 }
 
 class SSLServer : public QMainWindow
@@ -25,8 +26,8 @@ signals:
     void bla();
 
 private:
-    std::unique_ptr<Ui::SSLServer> ui;
-    std::shared_ptr<QTextEdit> console;
+    std::shared_ptr<Ui::SSLServer> m_ui;
+    std::shared_ptr<QTextEdit> m_console;
     std::shared_ptr<Server> m_server;
 };
 

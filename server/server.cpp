@@ -3,43 +3,43 @@
 #include <QDataStream>
 #include <sstream>
 #include <QAbstractSocket>
+#include <regex>
 
 Server::Server(QObject *parent) :
     QObject(parent),
-    m_expectedSize(-1)
+    m_socket(std::shared_ptr<QTcpSocket>(new QTcpSocket())),
+    m_server(std::unique_ptr<QTcpServer>(new QTcpServer())),
+    m_db(std::shared_ptr<DatabaseConnection>(new DatabaseConnection())),
+    m_messageCounter{0},
+    m_expectingSize{0}
 {
-    m_server = std::unique_ptr<QTcpServer>(new QTcpServer());
-    m_socket = std::shared_ptr<QTcpSocket>(new QTcpSocket());
-    m_db = std::shared_ptr<DatabaseConnection>(new DatabaseConnection());
-    m_receivedTemplate = std::shared_ptr<QByteArray>(new QByteArray);
+
 }
 
 Server::~Server()
 {
-
 }
 
-void Server::initialize(QHostAddress address, quint16 port)
+void Server::initialize(QString &addr, quint16 &port)
 {
-    if(this->m_server.get()->isListening()){
+    if(!checkIp(addr)) {
+        qDebug() << "Error - wrong IP address";
+        return;
+    }
+    if(m_server.get()->isListening()){
         emit updateLog("server is already listening");
-    } else if (this->m_server.get()->listen(address, port)) {
-        emit updateLog("server runs now...");
-        if (m_db.get()->setDb()){
-            emit updateLog("database connected");
-        } else {
-            emit updateLog("Warning: database not connected!");
-        }
+    } else if (m_server.get()->listen(QHostAddress(addr), port)) {
+        emit updateLog("server runs now...");        
     } else {
         emit updateLog("could not start a server");
     }
-    connect(this->m_server.get(), SIGNAL(newConnection()), this, SLOT(newConnection()));
+    connect(m_server.get(), SIGNAL(newConnection()), this, SLOT(newConnection()));
 }
 
 void Server::terminate()
 {
-    if (this->m_server.get()->isListening()){
-        this->m_server.get()->close();        
+    if (m_server.get()->isListening()){
+        m_server.get()->close();
         updateLog("server terminated...");
     }
     else {
@@ -49,19 +49,15 @@ void Server::terminate()
 
 void Server::newConnection()
 {
-    if(this->m_server.get()->hasPendingConnections()){
-        this->m_socket = std::shared_ptr<QTcpSocket>(this->m_server.get()->nextPendingConnection());
+    if(m_server.get()->hasPendingConnections()){
+        m_socket = std::shared_ptr<QTcpSocket>(m_server.get()->nextPendingConnection());
         qDebug() << m_socket.get()->state();
         connect(m_socket.get(), &QAbstractSocket::readyRead, this, &Server::receivedMessage);
         connect(m_socket.get(), &QAbstractSocket::connected, this, &Server::connectedClient);
         connect(m_socket.get(), SIGNAL(stateChanged(QAbstractSocket::SocketState)), this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
-//        connect(this->m_socket.get(), SIGNAL(readyRead()), this, SLOT(onReadyRead()));
-        connect(this->m_socket.get(), SIGNAL(disconnected()), this, SLOT(disconnectedClient()));
-//        connect(this->m_socket.get(), SIGNAL(connected()), this, SLOT(connectedClient()));
-//        connect(this->m_socket.get(), SIGNAL(stateChanged(QAbstractSocket::SocketState)), this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
-//        connect(this->m_socket.get(), SIGNAL(error(QAbstractSocket::SocketError)), this, SLOT(onError(QAbstractSocket::SocketError)));
+        connect(m_socket.get(), SIGNAL(disconnected()), this, SLOT(disconnectedClient()));
     }
-    if(!this->m_socket.get()->open(QIODevice::ReadOnly)){
+    if(!m_socket.get()->open(QIODevice::ReadOnly)){
         emit updateLog("error during setting a readonly mode...");
     }
 }
@@ -72,42 +68,31 @@ void Server::onReadyRead()
     qDebug() << r.size();
 }
 
-int Server::processHeader(QByteArray& header)
+int Server::size2int(QByteArray received)
 {
-    std::stringstream expect;
-    for(int i = 0; i != 6; ++i){
-        expect << header[i];
-    }
-    std::stringstream sizeOfTemplate;
-    if(expect.str() == "expect"){
-        for(int i = 6; i < header.size(); ++i){
-            sizeOfTemplate << header[i];
+    std::stringstream ss;
+    for (int i = 0; i < HEADERSIZE; ++i){
+        if (static_cast<unsigned char>(62) != static_cast<unsigned char>(received.at(i))) {
+            ss << static_cast<int>(received.at(i));
         }
-        return atoi(sizeOfTemplate.str().c_str());
     }
-    return -1;
-}
-
-void Server::clearAndSaveTemplate()
-{
-    if(m_expectedSize == m_receivedTemplate.get()->size()){
-        m_expectedSize = 0;
-        qDebug() << m_receivedTemplate.get()->toBase64();
-        //qDebug() << m_db.get()->writeTemplate(m_receivedTemplate.get()->toBase64());
-        m_receivedTemplate.get()->clear();
-    }
-    qDebug() << m_receivedTemplate.get()->size();
+    return atoi(ss.str().c_str());
 }
 
 void Server::receivedMessage()
 {
     QByteArray r = qobject_cast<QTcpSocket*>(sender())->readAll();
-    if(processHeader(r) != -1) this->m_expectedSize = processHeader(r);
-    else{
-        m_receivedTemplate.get()->append(r);
+    if (1 == ++m_messageCounter) {
+        m_expectingSize = size2int(r.mid(0, HEADERSIZE));
+        m_receivedTemplate2.clear();
     }
 
-    clearAndSaveTemplate();
+    m_receivedTemplate2.append(r);
+    if (m_expectingSize == m_receivedTemplate2.size()){
+        m_expectingSize = 0; //get ready to receive a new fingerprint
+        m_messageCounter = 0;
+        qDebug() <<"done: " << m_receivedTemplate2.size();
+    }
 }
 
 void Server::disconnectedClient()
@@ -129,4 +114,17 @@ void Server::onStateChanged(QAbstractSocket::SocketState state)
 void Server::onError(QAbstractSocket::SocketError error)
 {
     qDebug() << "Error: " << error;
+}
+
+bool Server::checkIp(QString &receivedIp)
+{
+    std::string stdIp = receivedIp.toStdString();
+    std::regex r{"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"};
+    if(std::regex_match(stdIp.begin(), stdIp.end(), r)){
+        return true;
+    } else if(stdIp == "localhost"){
+        return true;
+    } else {
+        return false;
+    }
 }
