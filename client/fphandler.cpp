@@ -6,7 +6,7 @@ FpHandler::FpHandler()
     scannerIndex = 0;
     errorCode = UFS_OK;
     errorMessage.resize(128);
-    capture.resize( 320 * 480 );
+    capture.resize(320*480);
     CHECK_ERROR(UFS_Init(), false);
     CHECK_ERROR(UFS_GetScannerHandle(scannerIndex, &scanner), false);
 }
@@ -53,18 +53,19 @@ void FpHandler::startScan()
 
 QByteArray FpHandler::getScanData()
 {
-    return QByteArray(getScanDataInternal(), static_cast<int>(capture.size()));
+    prependScannedDataSize(static_cast<int>(capture.size()) + HEADERSIZE);
+    return QByteArray(reinterpret_cast<const char*>(capture.data()), static_cast<int>(capture.size()));
 }
 
 const char* FpHandler::getScanDataInternal()
 {
-    prependScannedDataSize(static_cast<int>(capture.size()));
+    prependScannedDataSize(static_cast<int>(capture.size()) + HEADERSIZE);
     return reinterpret_cast<const char*>(capture.data());
 }
 
 void FpHandler::prependScannedDataSize(int dataSize)
 {
-    int cipherCount{0};
+    int cipherCount{0};    
     while (dataSize != 0) {
         capture.insert(capture.begin(), static_cast<unsigned char>(dataSize % 10));
         dataSize = dataSize / 10;
@@ -75,7 +76,7 @@ void FpHandler::prependScannedDataSize(int dataSize)
             //insert '>' to header to make sure it has the exact lenght
             capture.insert(capture.begin(), static_cast<unsigned char>(62));
         }
-    }
+    }    
     return;
 }
 

@@ -1,6 +1,7 @@
 #include "client.h"
 #include <regex>
 #include <QDataStream>
+#include <QImage>
 
 Client::Client(QObject *parent) :
     QObject(parent),
@@ -20,8 +21,10 @@ bool Client::isSocketConnected()
 void Client::writeTemplate()
 {    
     if (m_scanData.size() != m_socket.get()->write(m_scanData)) {
-        qDebug() << "Not all data sent...";
-    }
+        qDebug() << "Error sending data";
+    }    
+    QImage image((unsigned char*)m_scanData.data(), 320, 480, QImage::Format_Grayscale8);
+    image.save("/home/pva/njdj.png");
 }
 
 bool Client::connectionInit(QString &addr, quint16 &port)

@@ -1,24 +1,27 @@
 #ifndef SERVER_H
 #define SERVER_H
-#include <QSslSocket>
 #include <QTcpServer>
+#include <sstream>
+#include <QTcpSocket>
 #include <memory>
 #include <vector>
 #include <string>
-#include <QSqlDatabase>
-#include "connection.h"
-#include <QSqlQuery>
+#include "../extractor/extraction.h"
+#include "../extractor/extraction_caffenetwork.h"
+#include "databaseconnection.h"
+
 #define HEADERSIZE 15 // in this application, all the fingerprints are sent in format header<0, 15) + rawData<15, end)
+
 class Server : public QObject
 {
     Q_OBJECT
 private:
     std::shared_ptr<QTcpSocket> m_socket;
     std::unique_ptr<QTcpServer> m_server;
-    std::vector<QTcpSocket*> m_socket_list;    
-    std::shared_ptr<QByteArray> m_receivedTemplate;
-    QByteArray m_receivedTemplate2;
+    std::shared_ptr<Extraction> m_extractor;
+    std::vector<QTcpSocket*> m_socket_list;
     std::shared_ptr<DatabaseConnection> m_db;
+    QByteArray m_receivedTemplate;
     int m_messageCounter;
     int m_expectingSize;
 
@@ -43,6 +46,7 @@ private slots:
     void onError(QAbstractSocket::SocketError error);
 signals:
     void updateLog(QString log);
+    void sendImage(QByteArray);
 
 public slots:
 };

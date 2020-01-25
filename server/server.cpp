@@ -1,19 +1,19 @@
 #include "server.h"
 #include <iostream>
 #include <QDataStream>
-#include <sstream>
-#include <QAbstractSocket>
 #include <regex>
+#include "../extractor/extraction.h"
 
 Server::Server(QObject *parent) :
     QObject(parent),
     m_socket(std::shared_ptr<QTcpSocket>(new QTcpSocket())),
     m_server(std::unique_ptr<QTcpServer>(new QTcpServer())),
+    m_extractor(std::shared_ptr<Extraction>(new Extraction())),
     m_db(std::shared_ptr<DatabaseConnection>(new DatabaseConnection())),
     m_messageCounter{0},
     m_expectingSize{0}
 {
-
+    m_receivedTemplate.clear();
 }
 
 Server::~Server()
@@ -84,14 +84,16 @@ void Server::receivedMessage()
     QByteArray r = qobject_cast<QTcpSocket*>(sender())->readAll();
     if (1 == ++m_messageCounter) {
         m_expectingSize = size2int(r.mid(0, HEADERSIZE));
-        m_receivedTemplate2.clear();
+        m_receivedTemplate.clear();
     }
 
-    m_receivedTemplate2.append(r);
-    if (m_expectingSize == m_receivedTemplate2.size()){
+    m_receivedTemplate.append(r);
+    if (m_expectingSize == m_receivedTemplate.size()){
         m_expectingSize = 0; //get ready to receive a new fingerprint
         m_messageCounter = 0;
-        qDebug() <<"done: " << m_receivedTemplate2.size();
+        qDebug() <<"done: " << m_receivedTemplate.size();
+        qDebug() << "template: " << m_receivedTemplate.mid(m_receivedTemplate.size() - 80, m_receivedTemplate.size());
+        emit sendImage(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()));
     }
 }
 
@@ -119,7 +121,7 @@ void Server::onError(QAbstractSocket::SocketError error)
 bool Server::checkIp(QString &receivedIp)
 {
     std::string stdIp = receivedIp.toStdString();
-    std::regex r{"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"};
+    std::regex r{"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"};
     if(std::regex_match(stdIp.begin(), stdIp.end(), r)){
         return true;
     } else if(stdIp == "localhost"){
