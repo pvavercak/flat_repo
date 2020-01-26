@@ -19,7 +19,5 @@ unix:!macx: LIBS += -L$$PWD/suprema_sdk/bin/x64/ -lUFScanner
 INCLUDEPATH += $$PWD/suprema_sdk/include
 DEPENDPATH += $$PWD/suprema_sdk/include
 
-unix:!macx: LIBS += -L$$PWD/../build-Extraction-Desktop-Debug/ -lExtraction
-
 INCLUDEPATH += $$PWD/../extractor
 DEPENDPATH += $$PWD/../extractor

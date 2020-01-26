@@ -4,6 +4,8 @@
 #include <bitset>
 #include <iostream>
 #include <string>
+#include <QFileDialog>
+#include <QFile>
 ClientGUI::ClientGUI(QWidget *parent) :
     QMainWindow(parent),
     m_client(std::shared_ptr<Client>(new Client())),
@@ -37,7 +39,7 @@ void ClientGUI::error(QAbstractSocket::SocketError socketError)
 }
 
 void ClientGUI::on_scan_pressed()
-{   
+{
     m_client.get()->makeScan();
 }
 

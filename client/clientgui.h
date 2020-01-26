@@ -21,7 +21,7 @@ private slots:
     void disconnectedFromServer();
     void error(QAbstractSocket::SocketError socketError);
     void on_send_pressed();
-    void on_scan_pressed();
+    void on_scan_pressed();    
     void on_connectToServer_pressed();
     void on_disconnect_pressed();
 

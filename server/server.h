@@ -9,6 +9,7 @@
 #include "../extractor/extraction.h"
 #include "../extractor/extraction_caffenetwork.h"
 #include "databaseconnection.h"
+#include "preprocessing.h"
 
 #define HEADERSIZE 15 // in this application, all the fingerprints are sent in format header<0, 15) + rawData<15, end)
 
@@ -17,17 +18,19 @@ class Server : public QObject
     Q_OBJECT
 private:
     std::shared_ptr<QTcpSocket> m_socket;
-    std::unique_ptr<QTcpServer> m_server;
-    std::shared_ptr<Extraction> m_extractor;
+    std::unique_ptr<QTcpServer> m_server;    
     std::vector<QTcpSocket*> m_socket_list;
-    std::shared_ptr<DatabaseConnection> m_db;
+    std::shared_ptr<DatabaseConnection> m_db;    
     QByteArray m_receivedTemplate;
+    std::shared_ptr<Extraction> m_extractor;
+    std::shared_ptr<Preprocessing> m_preprocessing;
     int m_messageCounter;
     int m_expectingSize;
 
     //private methods
     int size2int(QByteArray received);
     bool checkIp(QString &addr);
+    void extraction();
 public:
     explicit Server(QObject *parent = nullptr);
     ~Server();
@@ -43,7 +46,12 @@ private slots:
     void disconnectedClient();
     void connectedClient();
     void onStateChanged(QAbstractSocket::SocketState state);
-    void onError(QAbstractSocket::SocketError error);
+    void onError(QAbstractSocket::SocketError error);    
+    void onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingResults);
+    void onPreprocessingErrorSlot(int error);
+    void onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults);
+    void onExtractionErrorSlot(int error);
+    void onExtractionProgressSlot(int progress);
 signals:
     void updateLog(QString log);
     void sendImage(QByteArray);

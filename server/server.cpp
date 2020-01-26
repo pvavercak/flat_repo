@@ -3,17 +3,27 @@
 #include <QDataStream>
 #include <regex>
 #include "../extractor/extraction.h"
+#include <QMap>
 
 Server::Server(QObject *parent) :
     QObject(parent),
     m_socket(std::shared_ptr<QTcpSocket>(new QTcpSocket())),
-    m_server(std::unique_ptr<QTcpServer>(new QTcpServer())),
-    m_extractor(std::shared_ptr<Extraction>(new Extraction())),
+    m_server(std::unique_ptr<QTcpServer>(new QTcpServer())),    
     m_db(std::shared_ptr<DatabaseConnection>(new DatabaseConnection())),
+    m_extractor(std::shared_ptr<Extraction>(new Extraction())),
+    m_preprocessing(std::shared_ptr<Preprocessing>(new Preprocessing())),
     m_messageCounter{0},
     m_expectingSize{0}
 {
     m_receivedTemplate.clear();
+    m_extractor.get()->setCPUOnly(true);
+    connect(m_preprocessing.get(), SIGNAL(preprocessingDoneSignal(PREPROCESSING_RESULTS)), this, SLOT(onPreprocessingDoneSlot(PREPROCESSING_RESULTS)));
+    connect(m_preprocessing.get(), SIGNAL(preprocessingErrorSignal(int)), this, SLOT(onPreprocessingErrorSlot(int)));
+    qRegisterMetaType<EXTRACTION_RESULTS >("EXTRACTION_RESULTS");
+    connect(m_extractor.get(), SIGNAL(extractionDoneSignal(EXTRACTION_RESULTS)), this, SLOT(onExtractionDoneSlot(EXTRACTION_RESULTS)));
+    connect(m_extractor.get(), SIGNAL(extractionErrorSignal(int)), this, SLOT(onExtractionErrorSlot(int)));
+    connect(m_extractor.get(), SIGNAL(extractionProgressSignal(int)), this, SLOT(onExtractionProgressSlot(int)));
+
 }
 
 Server::~Server()
@@ -91,9 +101,8 @@ void Server::receivedMessage()
     if (m_expectingSize == m_receivedTemplate.size()){
         m_expectingSize = 0; //get ready to receive a new fingerprint
         m_messageCounter = 0;
-        qDebug() <<"done: " << m_receivedTemplate.size();
-        qDebug() << "template: " << m_receivedTemplate.mid(m_receivedTemplate.size() - 80, m_receivedTemplate.size());
-        emit sendImage(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()));
+        sendImage(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()));
+        extraction();
     }
 }
 
@@ -118,6 +127,34 @@ void Server::onError(QAbstractSocket::SocketError error)
     qDebug() << "Error: " << error;
 }
 
+void Server::onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingResults)
+{
+    qDebug() << "preprocessing done, showing skeleton.";
+    m_extractor.get()->loadInput(preprocessingResults);
+    m_extractor.get()->start();
+}
+
+void Server::onPreprocessingErrorSlot(int error)
+{
+    qDebug() << "error extraction slot: " << error;
+}
+
+void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
+{
+    qDebug() << "extraction done: " << extractionResults.minutiaeCN.size();
+
+}
+
+void Server::onExtractionErrorSlot(int error)
+{
+    qDebug() << "extraction error number: " << error;
+}
+
+void Server::onExtractionProgressSlot(int progress)
+{
+    qDebug() << "extraction progress: " << progress;
+}
+
 bool Server::checkIp(QString &receivedIp)
 {
     std::string stdIp = receivedIp.toStdString();
@@ -129,4 +166,12 @@ bool Server::checkIp(QString &receivedIp)
     } else {
         return false;
     }
+}
+
+void Server::extraction()
+{
+    std::vector<unsigned char> templateToExtract(m_receivedTemplate.begin() + HEADERSIZE, m_receivedTemplate.end());
+    cv::Mat image(480, 320, CV_8UC1, templateToExtract.data());
+    m_preprocessing.get()->loadInput(image);
+    m_preprocessing.get()->start();
 }

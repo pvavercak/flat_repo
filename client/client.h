@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QTcpSocket>
 #include <QHostAddress>
+#include <QFile>
 #include <fphandler.h>
 class Client : public QObject
 {
@@ -15,8 +16,7 @@ public:
 
     //public methods
     bool isSocketConnected();
-    void writeTemplate();
-    bool writeHeader(QByteArray& headerToWrite, int len);
+    void writeTemplate();       
     bool connectionInit(QString &addr, quint16& port);
     void makeScan();
 

@@ -4,7 +4,7 @@ TARGET = server
 TEMPLATE = app
 DEFINES += QT_DEPRECATED_WARNINGS CPU_ONLY BOOST_SYSTEM_NO_DEPRECATED BOOST_NO_CXX11_HDR_SYSTEM_ERROR
 unix: PKGCONFIG += opencv
-CONFIG += link_pkgconfig c++17
+CONFIG += link_pkgconfig c++17 pthread
 SOURCES += main.cpp \
            server.cpp \
            servergui.cpp \
@@ -16,5 +16,7 @@ HEADERS += server.h \
 
 FORMS += server.ui
 
-unix:!macx: LIBS += -L$$PWD/../depends/lib -lExtraction
+unix:!macx: LIBS += -L$$PWD/../depends/lib/extraction -lExtraction \
+                    -L$$PWD/../depends/lib/preprocessing/ -lPreprocessing \
+                    -L/usr/local/lib -lafcpu
 INCLUDEPATH += $$PWD/../depends/includes

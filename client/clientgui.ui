@@ -14,7 +14,7 @@
    <string>ClientGUI</string>
   </property>
   <widget class="QWidget" name="centralWidget">
-   <widget class="QWidget" name="">
+   <widget class="QWidget" name="layoutWidget">
     <property name="geometry">
      <rect>
       <x>9</x>
@@ -42,6 +42,34 @@
        </item>
       </layout>
      </item>
+     <item row="2" column="0">
+      <layout class="QHBoxLayout" name="horizontalLayout_3">
+       <item>
+        <widget class="QPushButton" name="scan">
+         <property name="text">
+          <string>SCAN</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QPushButton" name="send">
+         <property name="text">
+          <string>SEND</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="7" column="0">
+      <widget class="QPushButton" name="disconnect">
+       <property name="text">
+        <string>Disconnect</string>
+       </property>
+      </widget>
+     </item>
+     <item row="6" column="0">
+      <widget class="QTextEdit" name="clientconsole"/>
+     </item>
      <item row="1" column="0">
       <layout class="QHBoxLayout" name="horizontalLayout_2">
        <item>
@@ -66,34 +94,6 @@
         </widget>
        </item>
       </layout>
-     </item>
-     <item row="2" column="0">
-      <layout class="QHBoxLayout" name="horizontalLayout_3">
-       <item>
-        <widget class="QPushButton" name="scan">
-         <property name="text">
-          <string>SCAN</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QPushButton" name="send">
-         <property name="text">
-          <string>SEND</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </item>
-     <item row="3" column="0">
-      <widget class="QTextEdit" name="clientconsole"/>
-     </item>
-     <item row="4" column="0">
-      <widget class="QPushButton" name="disconnect">
-       <property name="text">
-        <string>Disconnect</string>
-       </property>
-      </widget>
      </item>
     </layout>
    </widget>
