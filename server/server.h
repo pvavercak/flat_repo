@@ -18,8 +18,7 @@ class Server : public QTcpServer
 {
     Q_OBJECT
 private:
-    std::shared_ptr<QSslSocket> m_socket;
-    std::unique_ptr<QTcpServer> m_server;        
+    QVector<QSslSocket*> m_sockets;
     std::shared_ptr<DatabaseConnection> m_db;    
     QByteArray m_receivedTemplate;
     std::shared_ptr<Extraction> m_extractor;
@@ -32,7 +31,7 @@ private:
     //private methods
     int size2int(QByteArray received);
     bool checkIp(QString &addr);
-    void extraction();
+    void preprocessing();
 public:
     explicit Server(QObject *parent = nullptr);
     ~Server();
@@ -41,23 +40,22 @@ public:
     void initialize(QString &addr, quint16 &port);
     void terminate();    
 
-private slots:
-    void newConnectionSlot();
-    void onReadyRead();
+private slots:  
     void receivedMessage();
-    void disconnectedClient();
-    void connectedClient();
+    void disconnectedClientSlot();
     void onStateChanged(QAbstractSocket::SocketState state);
-    void onError(QAbstractSocket::SocketError error);    
+    void onErrorSlot(QAbstractSocket::SocketError error);
     void onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingResults);
     void onPreprocessingErrorSlot(int error);
     void onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults);
-    void onExtractionErrorSlot(int error);
-    void onExtractionProgressSlot(int progress);
+    void onExtractionErrorSlot(int error);    
     void onSslErrorSlot(const QList<QSslError> &errorList);
+    void onEncryptedSlot();
+    void incomingConnection(qintptr socketDescriptor) override;
 signals:
-    void updateLog(QString log);
+    void updateLog(QString);
     void sendImage(QByteArray);
+    void updateClientList(const QString, const QString, const QString);
 
 public slots:
 };

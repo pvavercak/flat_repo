@@ -6,89 +6,74 @@
 #include <QMap>
 
 Server::Server(QObject *parent) :
-    QTcpServer(parent),
-    m_socket(std::shared_ptr<QSslSocket>(new QSslSocket())),
-    m_server(std::unique_ptr<QTcpServer>(new QTcpServer())),    
+    QTcpServer(parent),     
     m_db(std::shared_ptr<DatabaseConnection>(new DatabaseConnection())),
     m_extractor(std::shared_ptr<Extraction>(new Extraction())),
     m_preprocessing(std::shared_ptr<Preprocessing>(new Preprocessing())),
     m_messageCounter{0},
     m_expectingSize{0},
-    m_certificate(QString(SRC_DIR) + "/certificate/server.cert.pem"),
-    m_key(QString(SRC_DIR) + "/certificate/server.key.pem")
+    m_certificate(QString(SRC_DIR) + "/certificates/server.cert.pem"),
+    m_key(QString(SRC_DIR) + "/certificates/server.key.pem")
 {
     m_receivedTemplate.clear();
-    m_extractor.get()->setCPUOnly(true);
-    connect(m_socket.get(), SIGNAL(sslErrors(const QList<QSslError> &)),this, SLOT(onSslErrorSlot(const QList<QSslError> &)));
+    m_extractor.get()->setCPUOnly(true);    
     connect(m_preprocessing.get(), SIGNAL(preprocessingDoneSignal(PREPROCESSING_RESULTS)), this, SLOT(onPreprocessingDoneSlot(PREPROCESSING_RESULTS)));
     connect(m_preprocessing.get(), SIGNAL(preprocessingErrorSignal(int)), this, SLOT(onPreprocessingErrorSlot(int)));
     qRegisterMetaType<EXTRACTION_RESULTS >("EXTRACTION_RESULTS");
     connect(m_extractor.get(), SIGNAL(extractionDoneSignal(EXTRACTION_RESULTS)), this, SLOT(onExtractionDoneSlot(EXTRACTION_RESULTS)));
-    connect(m_extractor.get(), SIGNAL(extractionErrorSignal(int)), this, SLOT(onExtractionErrorSlot(int)));
-    connect(m_extractor.get(), SIGNAL(extractionProgressSignal(int)), this, SLOT(onExtractionProgressSlot(int)));
-
+    connect(m_extractor.get(), SIGNAL(extractionErrorSignal(int)), this, SLOT(onExtractionErrorSlot(int)));    
 }
 
 Server::~Server()
 {
 }
 
-void Server::incomingConnection(qintprt socketDescriptor)
+void Server::incomingConnection(qintptr socketDescriptor)
 {
-    QSslSocket *newSocket = new QSslSocket();
-    connect(newSocket, SIGNAL(disconnect()), this, SLOT(onSocketDisconnected));
-    newSocket->setLocalCertificate(m_certificate);
-    newSocket
-            //sslerrors
-            //ignoresslErrors(list of errors)
+    QSslSocket *newSocket = new QSslSocket;
+    if(newSocket->setSocketDescriptor(socketDescriptor)){
+        addPendingConnection(newSocket);
+        connect(newSocket, &QSslSocket::encrypted, this, &Server::onEncryptedSlot);
+        connect(newSocket, SIGNAL(disconnected()), this, SLOT(disconnectedClientSlot()));
+        connect(newSocket, SIGNAL(error(QAbstractSocket::SocketError)),this, SLOT(onErrorSlot(QAbstractSocket::SocketError)));
+        connect(newSocket, SIGNAL(stateChanged(QAbstractSocket::SocketState)),this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
+        connect(newSocket, SIGNAL(sslErrors(const QList<QSslError> &)),this, SLOT(onSslErrorSlot(const QList<QSslError> &)));
+        connect(newSocket, &QSslSocket::readyRead, this, &Server::receivedMessage);
+        newSocket->setPrivateKey(m_key);
+        newSocket->setLocalCertificate(m_certificate);
+        newSocket->startServerEncryption();
+        m_sockets.push_back(newSocket);
+        emit updateClientList(newSocket->peerAddress().toString(), QString::number(newSocket->peerPort()), QString::number(newSocket->socketDescriptor()));
+        emit updateLog("Status: Client connected");
+    } else {
+        delete newSocket;
+    }
 }
 
 void Server::initialize(QString &addr, quint16 &port)
 {
     if(!checkIp(addr)) {
-        qDebug() << "Error - wrong IP address";
+        emit updateLog("Error: Wrong IP address");
         return;
     }
-    if(m_server.get()->isListening()){
-        emit updateLog("server is already listening");
-    } else if (m_server.get()->listen(QHostAddress(addr), port)) {
-        emit updateLog("server runs now...");        
+    if(this->isListening()){
+        emit updateLog("Warning: Listening state - skipping");
+    } else if (this->listen(QHostAddress(addr), port)) {
+        emit updateLog("Message: Waiting for a connection");
     } else {
-        emit updateLog("could not start a server");
-    }
-    connect(m_server.get(), SIGNAL(newConnection()), this, SLOT(newConnectionSlot()));
+        emit updateLog("Error: Could not start a server");
+    }    
 }
 
 void Server::terminate()
 {
-    if (m_server.get()->isListening()){
-        m_server.get()->close();
-        updateLog("server terminated...");
+    if (this->isListening()){
+        this->close();
+        updateLog("Message: Server terminated");
     }
     else {
-        updateLog("server is not running...");
+        updateLog("Error: Server not running");
     }
-}
-
-void Server::newConnectionSlot()
-{
-    if(m_server.get()->hasPendingConnections()){
-        m_socket = std::shared_ptr<QSslSocket>(qobject_cast<QSslSocket*>(m_server.get()->nextPendingConnection()));
-        connect(m_socket.get(), &QAbstractSocket::readyRead, this, &Server::receivedMessage);
-        connect(m_socket.get(), &QAbstractSocket::connected, this, &Server::connectedClient);
-        connect(m_socket.get(), SIGNAL(stateChanged(QAbstractSocket::SocketState)), this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
-        connect(m_socket.get(), SIGNAL(disconnected()), this, SLOT(disconnectedClient()));
-    }
-    if(!m_socket.get()->isOpen()){
-        emit updateLog("error in connection process");
-    }
-    m_socket.get()->startServerEncryption();
-}
-
-void Server::onReadyRead()
-{
-    QByteArray r = qobject_cast<QSslSocket*>(sender())->readAll();
-    qDebug() << r.size();
 }
 
 int Server::size2int(QByteArray received)
@@ -104,7 +89,7 @@ int Server::size2int(QByteArray received)
 
 void Server::receivedMessage()
 {
-    QByteArray r = qobject_cast<QTcpSocket*>(sender())->readAll();
+    QByteArray r = qobject_cast<QSslSocket*>(sender())->readAll();
     if (1 == ++m_messageCounter) {
         m_expectingSize = size2int(r.mid(0, HEADERSIZE));
         m_receivedTemplate.clear();
@@ -115,63 +100,74 @@ void Server::receivedMessage()
         m_expectingSize = 0; //get ready to receive a new fingerprint
         m_messageCounter = 0;
         sendImage(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()));
-        extraction();
+        preprocessing();
     }
 }
 
-void Server::disconnectedClient()
+void Server::preprocessing()
 {
-    emit updateLog("Client disconnected");
+    std::vector<unsigned char> templateToExtract(m_receivedTemplate.begin() + HEADERSIZE, m_receivedTemplate.end());
+    cv::Mat image(480, 320, CV_8UC1, templateToExtract.data());
+    m_preprocessing.get()->loadInput(image);
+    m_preprocessing.get()->start();
 }
 
-void Server::connectedClient()
+void Server::disconnectedClientSlot()
 {
-    qDebug() << m_socket.get()->peerAddress();
-    qDebug() << m_socket.get()->peerPort();
+    emit updateLog("Status: Client disconnected");
+    QSslSocket *disconnectedSocket = qobject_cast<QSslSocket*>(sender());
+    m_sockets.removeOne(disconnectedSocket);
 }
 
 void Server::onStateChanged(QAbstractSocket::SocketState state)
 {
-    qDebug() << "Status: " << state;
+    emit updateLog("Status: " + QString(state));
 }
 
-void Server::onError(QAbstractSocket::SocketError error)
+void Server::onErrorSlot(QAbstractSocket::SocketError error)
 {
-    qDebug() << "Error: " << error;
+    emit updateLog("Error: " + QString(error));
 }
 
 void Server::onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingResults)
 {
-    qDebug() << "preprocessing done, showing skeleton.";
-    m_extractor.get()->loadInput(preprocessingResults);
-    m_extractor.get()->start();
+    emit updateLog("Status: preprocessing done");
+//    m_extractor.get()->loadInput(preprocessingResults);
+//    m_extractor.get()->start();
 }
 
 void Server::onPreprocessingErrorSlot(int error)
 {
-    qDebug() << "error extraction slot: " << error;
+    emit updateLog("Error: (Preprocessing) " + QString(error));
 }
 
 void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
 {
-    qDebug() << "extraction done: " << extractionResults.minutiaeCN.size();
-
+    emit updateLog("Status: Extraction finished");
+    qDebug() << "OnExtractionDoneSlot: " << extractionResults.minutiaeCN.size();
 }
 
 void Server::onExtractionErrorSlot(int error)
 {
-    qDebug() << "extraction error number: " << error;
-}
-
-void Server::onExtractionProgressSlot(int progress)
-{
-    qDebug() << "extraction progress: " << progress;
+    emit updateLog("Error: (Extraction) " + QString(error));
 }
 
 void Server::onSslErrorSlot(const QList<QSslError> &errorList)
 {
     for(const QSslError &e : errorList){
-        qDebug() << "Ssl error: " << e.errorString();
+        qDebug() << "Ssl error: " << e.errorString();        
+        qobject_cast<QSslSocket*>(sender())->ignoreSslErrors(errorList);
+    }
+    emit updateLog("Status: Ignoring SSL errors [SD: " +
+                   QString::number(qobject_cast<QSslSocket*>(sender())->socketDescriptor()) +
+                   "]");
+}
+
+void Server::onEncryptedSlot()
+{
+    qDebug() << "onEncryptedSlot: ";
+    if (qobject_cast<QSslSocket*>(sender())->isEncrypted()){
+        updateLog("Status: Encrypted connection established [SD: " + QString::number(qobject_cast<QSslSocket*>(sender())->socketDescriptor()) + "]");
     }
 }
 
@@ -186,12 +182,4 @@ bool Server::checkIp(QString &receivedIp)
     } else {
         return false;
     }
-}
-
-void Server::extraction()
-{
-    std::vector<unsigned char> templateToExtract(m_receivedTemplate.begin() + HEADERSIZE, m_receivedTemplate.end());
-    cv::Mat image(480, 320, CV_8UC1, templateToExtract.data());
-    m_preprocessing.get()->loadInput(image);
-    m_preprocessing.get()->start();
 }

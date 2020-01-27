@@ -12,6 +12,7 @@ ClientGUI::ClientGUI(QWidget *parent) :
     m_ui(std::unique_ptr<Ui::ClientGUI>(new Ui::ClientGUI()))
 {
     m_ui.get()->setupUi(this);
+    connect(m_client.get(), SIGNAL(updateLog(QString)), m_ui.get()->clientconsole, SLOT(append(QString)));
 }
 
 ClientGUI::~ClientGUI()

@@ -1,5 +1,5 @@
 #include "servergui.h"
-#include "ui_sslserver.h"
+#include "ui_server.h"
 #include <QImage>
 
 ServerGUI::ServerGUI(QWidget *parent) :
@@ -8,13 +8,13 @@ ServerGUI::ServerGUI(QWidget *parent) :
     m_server(std::shared_ptr<Server>(new Server()))
 {
     m_ui.get()->setupUi(this);
-    QImage img(320, 480, QImage::Format_Grayscale8);
-    img.fill(QColor(255,255,255));
-    m_ui.get()->imagebrowser->setPixmap(QPixmap::fromImage(img));
-
-    m_console = std::shared_ptr<QTextEdit>(m_ui.get()->output);
+    m_ui.get()->imagebrowser->setStyleSheet("background-color: white;");
+    m_ui.get()->clientTable->insertColumn(0);
+    m_ui.get()->clientTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
+    m_ui.get()->clientTable->setHorizontalHeaderLabels(QStringList() << "Client information");
     QObject::connect(m_server.get(), SIGNAL(updateLog(QString)), m_ui.get()->output, SLOT(append(QString)));
-    connect(m_server.get(), SIGNAL(sendImage(QByteArray)), this, SLOT(showImage(QByteArray)));
+    connect(m_server.get(), SIGNAL(sendImage(QByteArray)), this, SLOT(showImage(QByteArray)));    
+    connect(m_server.get(), SIGNAL(updateClientList(const QString, const QString, const QString)), this, SLOT(updateClientListSlot(const QString, const QString, const QString)));
 }
 
 ServerGUI::~ServerGUI()
@@ -39,3 +39,10 @@ void ServerGUI::showImage(QByteArray arr)
     m_ui.get()->imagebrowser->setPixmap(QPixmap::fromImage(image));
 }
 
+void ServerGUI::updateClientListSlot(const QString addr, const QString port, const QString sd)
+{
+    m_ui.get()->clientTable->setRowCount(0);
+    m_ui.get()->clientTable->insertRow(m_ui.get()->clientTable->rowCount()-1);
+    QTableWidgetItem item(addr + ":" + port + " [" + sd + "]");
+    m_ui.get()->clientTable->setItem(m_ui.get()->clientTable->rowCount()-1, 0, &item);
+}

@@ -29,10 +29,13 @@ signals:
     void error(QAbstractSocket::SocketError socketError);
     void attemptConnect();
     void attemptToWrite();
+    void updateLog(QString);
 public slots:    
     void disconnectFromHost();
 private slots:
         void onReadyRead();
+        void onConnectedSlot();
+        void onEncryptedSlot();
         void onStateChanged(QAbstractSocket::SocketState state);
         void disconnectedClient();
         void encryptedSlot();
