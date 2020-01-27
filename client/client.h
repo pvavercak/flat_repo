@@ -3,10 +3,12 @@
 
 #include <memory>
 #include <QObject>
-#include <QTcpSocket>
+#include <QSslSocket>
 #include <QHostAddress>
 #include <QFile>
 #include <fphandler.h>
+#include <QList>
+#include <QSslError>
 class Client : public QObject
 {
     Q_OBJECT
@@ -33,9 +35,11 @@ private slots:
         void onReadyRead();
         void onStateChanged(QAbstractSocket::SocketState state);
         void disconnectedClient();
+        void encryptedSlot();
+        void onSslErrorSlot(const QList<QSslError> &errorList);
 private:
     std::unique_ptr<FpHandler> m_scanner;
-    std::shared_ptr<QTcpSocket> m_socket;
+    std::shared_ptr<QSslSocket> m_socket;
     QByteArray m_scanData;
 
     //private methods

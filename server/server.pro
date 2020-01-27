@@ -20,3 +20,5 @@ unix:!macx: LIBS += -L$$PWD/../depends/lib/extraction -lExtraction \
                     -L$$PWD/../depends/lib/preprocessing/ -lPreprocessing \
                     -L/usr/local/lib -lafcpu
 INCLUDEPATH += $$PWD/../depends/includes
+
+DEFINES += "SRC_DIR=\\\"$$_PRO_FILE_PWD_\\\""

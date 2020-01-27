@@ -6,17 +6,20 @@
 #include <QMap>
 
 Server::Server(QObject *parent) :
-    QObject(parent),
-    m_socket(std::shared_ptr<QTcpSocket>(new QTcpSocket())),
+    QTcpServer(parent),
+    m_socket(std::shared_ptr<QSslSocket>(new QSslSocket())),
     m_server(std::unique_ptr<QTcpServer>(new QTcpServer())),    
     m_db(std::shared_ptr<DatabaseConnection>(new DatabaseConnection())),
     m_extractor(std::shared_ptr<Extraction>(new Extraction())),
     m_preprocessing(std::shared_ptr<Preprocessing>(new Preprocessing())),
     m_messageCounter{0},
-    m_expectingSize{0}
+    m_expectingSize{0},
+    m_certificate(QString(SRC_DIR) + "/certificate/server.cert.pem"),
+    m_key(QString(SRC_DIR) + "/certificate/server.key.pem")
 {
     m_receivedTemplate.clear();
     m_extractor.get()->setCPUOnly(true);
+    connect(m_socket.get(), SIGNAL(sslErrors(const QList<QSslError> &)),this, SLOT(onSslErrorSlot(const QList<QSslError> &)));
     connect(m_preprocessing.get(), SIGNAL(preprocessingDoneSignal(PREPROCESSING_RESULTS)), this, SLOT(onPreprocessingDoneSlot(PREPROCESSING_RESULTS)));
     connect(m_preprocessing.get(), SIGNAL(preprocessingErrorSignal(int)), this, SLOT(onPreprocessingErrorSlot(int)));
     qRegisterMetaType<EXTRACTION_RESULTS >("EXTRACTION_RESULTS");
@@ -28,6 +31,16 @@ Server::Server(QObject *parent) :
 
 Server::~Server()
 {
+}
+
+void Server::incomingConnection(qintprt socketDescriptor)
+{
+    QSslSocket *newSocket = new QSslSocket();
+    connect(newSocket, SIGNAL(disconnect()), this, SLOT(onSocketDisconnected));
+    newSocket->setLocalCertificate(m_certificate);
+    newSocket
+            //sslerrors
+            //ignoresslErrors(list of errors)
 }
 
 void Server::initialize(QString &addr, quint16 &port)
@@ -43,7 +56,7 @@ void Server::initialize(QString &addr, quint16 &port)
     } else {
         emit updateLog("could not start a server");
     }
-    connect(m_server.get(), SIGNAL(newConnection()), this, SLOT(newConnection()));
+    connect(m_server.get(), SIGNAL(newConnection()), this, SLOT(newConnectionSlot()));
 }
 
 void Server::terminate()
@@ -57,24 +70,24 @@ void Server::terminate()
     }
 }
 
-void Server::newConnection()
+void Server::newConnectionSlot()
 {
     if(m_server.get()->hasPendingConnections()){
-        m_socket = std::shared_ptr<QTcpSocket>(m_server.get()->nextPendingConnection());
-        qDebug() << m_socket.get()->state();
+        m_socket = std::shared_ptr<QSslSocket>(qobject_cast<QSslSocket*>(m_server.get()->nextPendingConnection()));
         connect(m_socket.get(), &QAbstractSocket::readyRead, this, &Server::receivedMessage);
         connect(m_socket.get(), &QAbstractSocket::connected, this, &Server::connectedClient);
         connect(m_socket.get(), SIGNAL(stateChanged(QAbstractSocket::SocketState)), this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
         connect(m_socket.get(), SIGNAL(disconnected()), this, SLOT(disconnectedClient()));
     }
-    if(!m_socket.get()->open(QIODevice::ReadOnly)){
-        emit updateLog("error during setting a readonly mode...");
+    if(!m_socket.get()->isOpen()){
+        emit updateLog("error in connection process");
     }
+    m_socket.get()->startServerEncryption();
 }
 
 void Server::onReadyRead()
 {
-    QByteArray r = qobject_cast<QTcpSocket*>(sender())->readAll();
+    QByteArray r = qobject_cast<QSslSocket*>(sender())->readAll();
     qDebug() << r.size();
 }
 
@@ -153,6 +166,13 @@ void Server::onExtractionErrorSlot(int error)
 void Server::onExtractionProgressSlot(int progress)
 {
     qDebug() << "extraction progress: " << progress;
+}
+
+void Server::onSslErrorSlot(const QList<QSslError> &errorList)
+{
+    for(const QSslError &e : errorList){
+        qDebug() << "Ssl error: " << e.errorString();
+    }
 }
 
 bool Server::checkIp(QString &receivedIp)

@@ -2,7 +2,8 @@
 #define SERVER_H
 #include <QTcpServer>
 #include <sstream>
-#include <QTcpSocket>
+#include <QSslSocket>
+#include <QSslError>
 #include <memory>
 #include <vector>
 #include <string>
@@ -13,19 +14,20 @@
 
 #define HEADERSIZE 15 // in this application, all the fingerprints are sent in format header<0, 15) + rawData<15, end)
 
-class Server : public QObject
+class Server : public QTcpServer
 {
     Q_OBJECT
 private:
-    std::shared_ptr<QTcpSocket> m_socket;
-    std::unique_ptr<QTcpServer> m_server;    
-    std::vector<QTcpSocket*> m_socket_list;
+    std::shared_ptr<QSslSocket> m_socket;
+    std::unique_ptr<QTcpServer> m_server;        
     std::shared_ptr<DatabaseConnection> m_db;    
     QByteArray m_receivedTemplate;
     std::shared_ptr<Extraction> m_extractor;
     std::shared_ptr<Preprocessing> m_preprocessing;
     int m_messageCounter;
     int m_expectingSize;
+    QString m_certificate;
+    QString m_key;
 
     //private methods
     int size2int(QByteArray received);
@@ -40,7 +42,7 @@ public:
     void terminate();    
 
 private slots:
-    void newConnection();
+    void newConnectionSlot();
     void onReadyRead();
     void receivedMessage();
     void disconnectedClient();
@@ -52,6 +54,7 @@ private slots:
     void onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults);
     void onExtractionErrorSlot(int error);
     void onExtractionProgressSlot(int progress);
+    void onSslErrorSlot(const QList<QSslError> &errorList);
 signals:
     void updateLog(QString log);
     void sendImage(QByteArray);

@@ -6,8 +6,10 @@
 Client::Client(QObject *parent) :
     QObject(parent),
     m_scanner(std::unique_ptr<FpHandler>(new FpHandler())),
-    m_socket(std::shared_ptr<QTcpSocket>(new QTcpSocket()))
-{                
+    m_socket(std::shared_ptr<QSslSocket>(new QSslSocket()))
+{
+    connect(m_socket.get(), SIGNAL(encrypted()), this, SLOT(encryptedSlot()));
+    connect(m_socket.get(), SIGNAL(sslErrors(const QList<SslError>&)), this, SLOT(onSslErrorSlot(const QList<SslError>&)));    
 }
 
 bool Client::isSocketConnected()
@@ -30,7 +32,7 @@ void Client::writeTemplate()
 bool Client::connectionInit(QString &addr, quint16 &port)
 {
     if (checkIp(addr)) {
-        m_socket.get()->connectToHost(addr, port);
+        m_socket.get()->connectToHostEncrypted(addr, port);
     } else {
         qDebug() << "Provide a valid host address";
     }
@@ -38,7 +40,7 @@ bool Client::connectionInit(QString &addr, quint16 &port)
         qDebug() << "Could not connect to host";
         return false;
     }
-    connect(m_socket.get(), &QTcpSocket::readyRead, this, &Client::onReadyRead);
+    connect(m_socket.get(), &QSslSocket::readyRead, this, &Client::onReadyRead);
     connect(m_socket.get(), SIGNAL(stateChanged(QAbstractSocket::SocketState)), this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
     connect(m_socket.get(), SIGNAL(disconnected()), this, SLOT(disconnectedClient()));
     return true;
@@ -72,10 +74,22 @@ void Client::disconnectedClient()
     qDebug() << "Client is disconnected from server";
 }
 
+void Client::encryptedSlot()
+{
+    qDebug() << "connection is encrypted";
+}
+
+void Client::onSslErrorSlot(const QList<QSslError> &errorList)
+{
+    for(const QSslError& e : errorList){
+        qDebug() << "Ssl error: " << e.errorString();
+    }
+}
+
 bool Client::checkIp(QString &receivedIp)
 {
     std::string stdIp = receivedIp.toStdString();
-    std::regex r{"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"};
+    std::regex r{"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"};
     if(std::regex_match(stdIp.begin(), stdIp.end(), r)){        
         return true;
     } else if(stdIp == "localhost"){        
