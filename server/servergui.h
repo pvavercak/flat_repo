@@ -22,7 +22,8 @@ private slots:
     void on_start_server_pressed();
     void on_terminate_pressed();
     void showImage(QByteArray arr);
-    void updateClientListSlot(const QString addr, const QString port, const QString sd);
+    void showImage(QPixmap img);
+    void updateClientListSlot(QVector<QSslSocket*> sokets);
 signals:
     void bla();
 

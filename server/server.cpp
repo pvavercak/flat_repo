@@ -1,9 +1,10 @@
 #include "server.h"
 #include <iostream>
-#include <QDataStream>
+#include <QPainter>
 #include <regex>
 #include "../extractor/extraction.h"
 #include <QMap>
+#include <QtMath>
 
 Server::Server(QObject *parent) :
     QTcpServer(parent),     
@@ -43,7 +44,7 @@ void Server::incomingConnection(qintptr socketDescriptor)
         newSocket->setLocalCertificate(m_certificate);
         newSocket->startServerEncryption();
         m_sockets.push_back(newSocket);
-        emit updateClientList(newSocket->peerAddress().toString(), QString::number(newSocket->peerPort()), QString::number(newSocket->socketDescriptor()));
+        emit updateClientList(m_sockets);
         emit updateLog("Status: Client connected");
     } else {
         delete newSocket;
@@ -126,30 +127,54 @@ void Server::onStateChanged(QAbstractSocket::SocketState state)
 
 void Server::onErrorSlot(QAbstractSocket::SocketError error)
 {
-    emit updateLog("Error: " + QString(error));
+    emit updateLog("Error: " + QString(static_cast<unsigned char>(error)));
 }
 
 void Server::onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingResults)
 {
-    emit updateLog("Status: preprocessing done");
-//    m_extractor.get()->loadInput(preprocessingResults);
-//    m_extractor.get()->start();
+    emit updateLog("Status: preprocessing done");    
+    m_extractor.get()->loadInput(preprocessingResults);
+    m_extractor.get()->start();
 }
 
 void Server::onPreprocessingErrorSlot(int error)
 {
-    emit updateLog("Error: (Preprocessing) " + QString(error));
+    emit updateLog("Error: Preprocessor returned " + QString::number(error));
 }
 
 void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
 {
-    emit updateLog("Status: Extraction finished");
-    qDebug() << "OnExtractionDoneSlot: " << extractionResults.minutiaeCN.size();
+    emit updateLog("Status: Extraction finished");    
+    minutiaeVisualisation(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()), extractionResults.minutiaePredictedFixed);
 }
 
 void Server::onExtractionErrorSlot(int error)
+{    
+    emit updateLog("Error: Extractor returned " + QString::number(error));
+}
+
+void Server::minutiaeVisualisation(QByteArray fingerprint, QVector<MINUTIA> minutiaeList)
 {
-    emit updateLog("Error: (Extraction) " + QString(error));
+    QImage fingerImage(reinterpret_cast<unsigned char*>(fingerprint.data()),320, 480, QImage::Format_Grayscale8);
+    QPixmap pixmap = QPixmap::fromImage(fingerImage);
+    QPainter painter(&pixmap);
+    QPen pen;
+    pen.setWidth(1);
+    for (const auto& point : minutiaeList){
+        if (point.quality > 65) {
+            pen.setColor(QColor(0, 100 + point.quality, 0));
+        } else {
+            pen.setColor(QColor(200 - point.quality, 0, 0));
+        }
+        painter.setPen(pen);
+        painter.drawRect(point.xy.x() - 3, point.xy.y() - 3, 10, 10);
+        QPoint p1(point.xy);
+        QPoint p2(point.xy.x() + static_cast<int>(qCos(point.angle) * 20), point.xy.y() + static_cast<int>(qSin(point.angle) *20));
+        painter.drawLine(p1, p2);
+    }
+    painter.end();
+    sendImage(pixmap);
+    pixmap.save("/home/pva/Desktop/drawedmins.png");
 }
 
 void Server::onSslErrorSlot(const QList<QSslError> &errorList)
@@ -164,8 +189,7 @@ void Server::onSslErrorSlot(const QList<QSslError> &errorList)
 }
 
 void Server::onEncryptedSlot()
-{
-    qDebug() << "onEncryptedSlot: ";
+{    
     if (qobject_cast<QSslSocket*>(sender())->isEncrypted()){
         updateLog("Status: Encrypted connection established [SD: " + QString::number(qobject_cast<QSslSocket*>(sender())->socketDescriptor()) + "]");
     }

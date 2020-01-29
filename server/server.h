@@ -4,6 +4,7 @@
 #include <sstream>
 #include <QSslSocket>
 #include <QSslError>
+#include <QPixmap>
 #include <memory>
 #include <vector>
 #include <string>
@@ -32,6 +33,7 @@ private:
     int size2int(QByteArray received);
     bool checkIp(QString &addr);
     void preprocessing();
+    void minutiaeVisualisation(QByteArray fingerprint, QVector<MINUTIA> minutiaeList);
 public:
     explicit Server(QObject *parent = nullptr);
     ~Server();
@@ -55,7 +57,8 @@ private slots:
 signals:
     void updateLog(QString);
     void sendImage(QByteArray);
-    void updateClientList(const QString, const QString, const QString);
+    void sendImage(QPixmap);
+    void updateClientList(QVector<QSslSocket*>);
 
 public slots:
 };

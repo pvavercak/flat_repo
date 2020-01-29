@@ -8,13 +8,17 @@ ServerGUI::ServerGUI(QWidget *parent) :
     m_server(std::shared_ptr<Server>(new Server()))
 {
     m_ui.get()->setupUi(this);
-    m_ui.get()->imagebrowser->setStyleSheet("background-color: white;");
-    m_ui.get()->clientTable->insertColumn(0);
+    m_ui.get()->imagebrowser->setStyleSheet("background-color: white;");    
     m_ui.get()->clientTable->horizontalHeader()->setSectionResizeMode(QHeaderView::Stretch);
     m_ui.get()->clientTable->setHorizontalHeaderLabels(QStringList() << "Client information");
+    m_ui.get()->clientTable->insertRow (m_ui.get()->clientTable->rowCount());
+    m_ui.get()->clientTable->insertColumn (m_ui.get()->clientTable->columnCount());
+    m_ui.get()->clientTable->insertColumn (m_ui.get()->clientTable->columnCount());
+    m_ui.get()->clientTable->insertColumn (m_ui.get()->clientTable->columnCount());
     QObject::connect(m_server.get(), SIGNAL(updateLog(QString)), m_ui.get()->output, SLOT(append(QString)));
     connect(m_server.get(), SIGNAL(sendImage(QByteArray)), this, SLOT(showImage(QByteArray)));    
-    connect(m_server.get(), SIGNAL(updateClientList(const QString, const QString, const QString)), this, SLOT(updateClientListSlot(const QString, const QString, const QString)));
+    connect(m_server.get(), SIGNAL(sendImage(QPixmap)), this, SLOT(showImage(QPixmap)));
+    connect(m_server.get(), SIGNAL(updateClientList(QVector<QSslSocket*>)), this, SLOT(updateClientListSlot(QVector<QSslSocket*>)));
 }
 
 ServerGUI::~ServerGUI()
@@ -39,10 +43,25 @@ void ServerGUI::showImage(QByteArray arr)
     m_ui.get()->imagebrowser->setPixmap(QPixmap::fromImage(image));
 }
 
-void ServerGUI::updateClientListSlot(const QString addr, const QString port, const QString sd)
+void ServerGUI::showImage(QPixmap img)
 {
+    m_ui.get()->imagebrowser->setPixmap(img);
+}
+
+void ServerGUI::updateClientListSlot(QVector<QSslSocket*> sockets)
+{
+    m_ui.get()->clientTable->clearContents();
     m_ui.get()->clientTable->setRowCount(0);
-    m_ui.get()->clientTable->insertRow(m_ui.get()->clientTable->rowCount()-1);
-    QTableWidgetItem item(addr + ":" + port + " [" + sd + "]");
-    m_ui.get()->clientTable->setItem(m_ui.get()->clientTable->rowCount()-1, 0, &item);
+    for (auto& socket  : sockets){
+        m_ui.get()->clientTable->insertRow (m_ui.get()->clientTable->rowCount());
+        m_ui.get()->clientTable->setItem( m_ui.get()->clientTable->rowCount()-1,
+                                 0,
+                                 new QTableWidgetItem(socket->peerAddress().toString()));
+        m_ui.get()->clientTable->setItem( m_ui.get()->clientTable->rowCount()-1,
+                                 1,
+                                 new QTableWidgetItem(QString::number(socket->peerPort())));
+        m_ui.get()->clientTable->setItem( m_ui.get()->clientTable->rowCount()-1,
+                                 2,
+                                 new QTableWidgetItem(QString::number(socket->socketDescriptor())));
+    }
 }
