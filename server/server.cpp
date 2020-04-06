@@ -12,9 +12,11 @@ Server::Server(QObject *parent) :
     m_extractor(std::shared_ptr<Extraction>(new Extraction())),
     m_preprocessing(std::shared_ptr<Preprocessing>(new Preprocessing())),
     m_messageCounter{0},
-    m_expectingSize{0},
+    m_expectingSize{-1},
     m_certificate(QString(SRC_DIR) + "/certificates/server.cert.pem"),
-    m_key(QString(SRC_DIR) + "/certificates/server.key.pem")
+    m_key(QString(SRC_DIR) + "/certificates/server.key.pem"),
+    m_receivedUserFingers(0),
+    currentUser()
 {
     m_receivedTemplate.clear();
     m_extractor.get()->setCPUOnly(true);    
@@ -77,40 +79,32 @@ void Server::terminate()
     }
 }
 
-int Server::size2int(QByteArray received)
-{
-    std::stringstream ss;
-    for (int i = 0; i < HEADERSIZE; ++i){
-        if (static_cast<unsigned char>(62) != static_cast<unsigned char>(received.at(i))) {
-            ss << static_cast<int>(received.at(i));
-        }
-    }
-    return atoi(ss.str().c_str());
-}
-
 void Server::receivedMessage()
 {
-    QByteArray r = qobject_cast<QSslSocket*>(sender())->readAll();
-    if (1 == ++m_messageCounter) {
-        m_expectingSize = size2int(r.mid(0, HEADERSIZE));
-        m_receivedTemplate.clear();
+    QSslSocket *source = qobject_cast<QSslSocket*>(sender());
+    qint64 incomingBytes =  source->bytesAvailable();
+    QByteArray r = source->readAll();
+    if (-1 == m_expectingSize) {
+        QDataStream incommingStream(&r, QIODevice::ReadOnly);
+        incommingStream >> m_expectingSize;
     }
-
-    m_receivedTemplate.append(r);
-    if (m_expectingSize == m_receivedTemplate.size()){
-        m_expectingSize = 0; //get ready to receive a new fingerprint
-        m_messageCounter = 0;
-        sendImage(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()));
-        preprocessing();
+    if (m_expectingSize > m_receivedTemplate.size() + incomingBytes) {
+        m_receivedTemplate.push_back(r);
+    } else {
+        m_receivedTemplate.push_back(r);
+        deserializeCurrentlyReceivedUser(r);
+        qDebug() << m_receivedTemplate.size() << " against expecting: " << m_expectingSize;
+        m_expectingSize = -1;
+        m_receivedTemplate.clear();
     }
 }
 
 void Server::preprocessing()
 {
-    std::vector<unsigned char> templateToExtract(m_receivedTemplate.begin() + HEADERSIZE, m_receivedTemplate.end());
-    cv::Mat image(480, 320, CV_8UC1, templateToExtract.data());
-    m_preprocessing.get()->loadInput(image);
-    m_preprocessing.get()->start();
+//    std::vector<unsigned char> templateToExtract(m_receivedTemplate.begin() + HEADERSIZE, m_receivedTemplate.end());
+//    cv::Mat image(480, 320, CV_8UC1, templateToExtract.data());
+//    m_preprocessing.get()->loadInput(image);
+//    m_preprocessing.get()->start();
 }
 
 void Server::disconnectedClientSlot()
@@ -145,7 +139,7 @@ void Server::onPreprocessingErrorSlot(int error)
 void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
 {
     emit updateLog("Status: Extraction finished");    
-    minutiaeVisualisation(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()), extractionResults.minutiaePredictedFixed);
+//    minutiaeVisualisation(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()), extractionResults.minutiaePredictedFixed);
 }
 
 void Server::onExtractionErrorSlot(int error)
@@ -153,28 +147,38 @@ void Server::onExtractionErrorSlot(int error)
     emit updateLog("Error: Extractor returned " + QString::number(error));
 }
 
-void Server::minutiaeVisualisation(QByteArray fingerprint, QVector<MINUTIA> minutiaeList)
+//void Server::minutiaeVisualisation(QByteArray fingerprint, QVector<MINUTIA> minutiaeList)
+//{
+//    QImage fingerImage(reinterpret_cast<unsigned char*>(fingerprint.data()),320, 480, QImage::Format_Grayscale8);
+//    QPixmap pixmap = QPixmap::fromImage(fingerImage);
+//    QPainter painter(&pixmap);
+//    QPen pen;
+//    pen.setWidth(1);
+//    for (const auto& point : minutiaeList){
+//        if (point.quality > 65) {
+//            pen.setColor(QColor(0, 100 + point.quality, 0));
+//        } else {
+//            pen.setColor(QColor(200 - point.quality, 0, 0));
+//        }
+//        painter.setPen(pen);
+//        painter.drawRect(point.xy.x() - 3, point.xy.y() - 3, 10, 10);
+//        QPoint p1(point.xy);
+//        QPoint p2(point.xy.x() + static_cast<int>(qCos(point.angle) * 20), point.xy.y() + static_cast<int>(qSin(point.angle) *20));
+//        painter.drawLine(p1, p2);
+//    }
+//    painter.end();
+//    sendImage(pixmap);
+//    pixmap.save("/home/pva/Desktop/drawedmins.png");
+//}
+
+void Server::deserializeCurrentlyReceivedUser(QByteArray arr)
 {
-    QImage fingerImage(reinterpret_cast<unsigned char*>(fingerprint.data()),320, 480, QImage::Format_Grayscale8);
-    QPixmap pixmap = QPixmap::fromImage(fingerImage);
-    QPainter painter(&pixmap);
-    QPen pen;
-    pen.setWidth(1);
-    for (const auto& point : minutiaeList){
-        if (point.quality > 65) {
-            pen.setColor(QColor(0, 100 + point.quality, 0));
-        } else {
-            pen.setColor(QColor(200 - point.quality, 0, 0));
-        }
-        painter.setPen(pen);
-        painter.drawRect(point.xy.x() - 3, point.xy.y() - 3, 10, 10);
-        QPoint p1(point.xy);
-        QPoint p2(point.xy.x() + static_cast<int>(qCos(point.angle) * 20), point.xy.y() + static_cast<int>(qSin(point.angle) *20));
-        painter.drawLine(p1, p2);
-    }
-    painter.end();
-    sendImage(pixmap);
-    pixmap.save("/home/pva/Desktop/drawedmins.png");
+    QByteArray inputBytes = m_receivedTemplate;
+    QDataStream tempStream(inputBytes);
+    int sz{0};
+    quint8 fpcount{0};
+    fingers fngrs(0);
+    tempStream >> sz >> fpcount >> fngrs;
 }
 
 void Server::onSslErrorSlot(const QList<QSslError> &errorList)

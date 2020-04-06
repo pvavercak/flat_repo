@@ -1,35 +1,22 @@
-#include "client.h"
-#include <regex>
-#include <QDataStream>
-#include <QImage>
+#include "client.hpp"
 
 Client::Client(QObject *parent) :
     QObject(parent),
-    m_scanner(std::unique_ptr<FpHandler>(new FpHandler())),
-    m_socket(std::shared_ptr<QSslSocket>(new QSslSocket()))
+    m_socket(std::shared_ptr<QSslSocket>(new QSslSocket())),
+    m_user{}
 {    
+    CHECK_ERROR(UFS_Init());
+    CHECK_ERROR(UFS_GetScannerHandle(0, &m_scanner));
     connect(m_socket.get(), SIGNAL(encrypted()), this, SLOT(encryptedSlot()));
     connect(m_socket.get(), SIGNAL(sslErrors(const QList<QSslError>&)), this, SLOT(onSslErrorSlot(const QList<QSslError>&)));
 }
 
-bool Client::isSocketConnected()
+Client::~Client()
 {
-    if (m_socket.get()->isOpen()) {
-        return true;
-    }
-    return false;
+    CHECK_ERROR(UFS_Uninit());
 }
 
-void Client::writeTemplate()
-{    
-    if (m_scanData.size() != m_socket.get()->write(m_scanData)) {
-        qDebug() << "Error sending data";
-    }    
-//    QImage image((unsigned char*)m_scanData.data(), 320, 480, QImage::Format_Grayscale8);
-//    image.save("/home/pva/njdj.png");
-}
-
-bool Client::connectionInit(QString &addr, quint16 &port)
+bool Client::connectionInit(const QString &addr, const quint16 &port)
 {
     if (checkIp(addr)) {
         connect(m_socket.get(), SIGNAL(connected()), this, SLOT(onConnectedSlot()));
@@ -50,11 +37,76 @@ bool Client::connectionInit(QString &addr, quint16 &port)
     return true;
 }
 
-void Client::makeScan()
+bool Client::deleteCurrentlyEnrollingUser()
 {
-    m_scanData.clear(); //clear old scan data
-    m_scanner.get()->startScan();
-    m_scanData = m_scanner.get()->getScanData();
+    if (!m_user.removeAllFingers()) {
+        emit updateLog("Message: User cleared");
+        return true;
+    } else {
+        emit updateLog("Error: User was not cleared");
+        return false;
+    }
+}
+
+bool Client::addFingerFromScanner()
+{
+    quint8 prev_count{m_user.getFingersCount()};
+    finger f = readFingerFromScanner();
+    if (f.isEmpty()){
+        return false;
+    }
+
+    quint8 curr_count{m_user.addFinger(f)};
+
+    if (1 != curr_count - prev_count){
+        return false;
+    }
+
+    return true;
+}
+
+bool Client::addFingerFromFile(const QString &imagePath)
+{
+    quint8 prev_count{m_user.getFingersCount()};
+    finger f = readFingerFromImage(imagePath);
+    if (f.isEmpty()) {
+        return false;
+    }
+
+    quint8 curr_count{m_user.addFinger(f)};
+
+    if (1 != curr_count - prev_count){
+        return false;
+    }
+
+    return true;
+}
+
+void Client::newUser()
+{
+    m_user.removeAllFingers();
+}
+
+bool Client::enrollUser()
+{
+    if(m_socket.get()->isEncrypted()){
+        QByteArray serialization_buffer{};
+        m_user.serializeUser(serialization_buffer);
+        qint64 nic = m_socket.get()->write(serialization_buffer);
+        qDebug() << nic;
+//        if(serialization_buffer.size() != m_socket.get()->write(serialization_buffer)){
+//            return false;
+//        }
+    } else {
+        return false;
+    }
+
+    return true;
+}
+
+bool Client::processInputFinger()
+{
+    return true;
 }
 
 void Client::disconnectFromHost()
@@ -100,7 +152,15 @@ void Client::onSslErrorSlot(const QList<QSslError> &errorList)
     m_socket.get()->ignoreSslErrors(errorList);
 }
 
-bool Client::checkIp(QString &receivedIp)
+bool Client::isSocketConnected()
+{
+    if (m_socket.get()->isOpen()) {
+        return true;
+    }
+    return false;
+}
+
+bool Client::checkIp(const QString &receivedIp)
 {
     std::string stdIp = receivedIp.toStdString();
     std::regex r{"^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])$"};
@@ -110,5 +170,48 @@ bool Client::checkIp(QString &receivedIp)
         return true;
     } else {
         return false;
+    }
+}
+
+finger Client::readFingerFromScanner()
+{
+    CHECK_ERROR(UFS_ClearCaptureImageBuffer(m_scanner));
+    CHECK_ERROR(UFS_CaptureSingleImage(m_scanner));
+    int width{0}, height{0}, resolution{0};
+    CHECK_ERROR(UFS_GetCaptureImageBufferInfo(m_scanner, &width, &height, &resolution));
+    finger outFinger(width * height);
+    UFS_GetCaptureImageBuffer(m_scanner, outFinger.data());
+    return outFinger;
+}
+
+finger Client::readFingerFromImage(QString imagePath)
+{
+    finger outFinger(0);
+    if (!QFile::exists(imagePath)) {
+        return outFinger;
+    }
+
+    QByteArray imageFormat{};
+    {
+        QImageReader ireader(imagePath);
+        imageFormat = ireader.format();
+    }
+    if (imageFormat.isEmpty()) {
+        return outFinger;
+    }
+    {
+        QImage image(imagePath, imageFormat.data());
+        outFinger.resize(image.byteCount());
+        memcpy(outFinger.data(), image.bits(), static_cast<size_t> (image.byteCount()));
+    }
+    return outFinger;
+}
+
+void Client::CHECK_ERROR(UFS_STATUS err){
+    if(UFS_OK != err){
+        char *message{};
+        UFS_GetErrorString(err, message);
+        qDebug() << QString(message);
+        exit(err);
     }
 }

@@ -12,15 +12,14 @@
 #include "../extractor/extraction_caffenetwork.h"
 #include "databaseconnection.h"
 #include "preprocessing.h"
-
-#define HEADERSIZE 15 // in this application, all the fingerprints are sent in format header<0, 15) + rawData<15, end)
+#include "user.hpp"
 
 class Server : public QTcpServer
 {
     Q_OBJECT
 private:
     QVector<QSslSocket*> m_sockets;
-    std::shared_ptr<DatabaseConnection> m_db;    
+    std::shared_ptr<DatabaseConnection> m_db;
     QByteArray m_receivedTemplate;
     std::shared_ptr<Extraction> m_extractor;
     std::shared_ptr<Preprocessing> m_preprocessing;
@@ -28,15 +27,19 @@ private:
     int m_expectingSize;
     QString m_certificate;
     QString m_key;
+    int m_messageSize;
+    quint8 m_receivedUserFingersCount;
+    fingers m_receivedUserFingers;
+    User currentUser;
 
     //private methods
-    int size2int(QByteArray received);
     bool checkIp(QString &addr);
     void preprocessing();
-    void minutiaeVisualisation(QByteArray fingerprint, QVector<MINUTIA> minutiaeList);
+//    void minutiaeVisualisation(QByteArray fingerprint, QVector<MINUTIA> minutiaeList);
+    void deserializeCurrentlyReceivedUser(QByteArray arr);
 public:
     explicit Server(QObject *parent = nullptr);
-    ~Server();
+    ~Server() override;
 
     //public methods
     void initialize(QString &addr, quint16 &port);
