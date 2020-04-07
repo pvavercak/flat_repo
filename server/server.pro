@@ -8,13 +8,11 @@ CONFIG += link_pkgconfig c++17 pthread
 SOURCES += main.cpp \
            server.cpp \
            servergui.cpp \
-           databaseconnection.cpp \
-           $$PWD/../client/user.cpp
+           databaseconnection.cpp
 
 HEADERS += server.h \
            servergui.h \
-           databaseconnection.h \
-           $$PWD/../client/user.hpp
+           databaseconnection.h
 
 FORMS += server.ui
 
@@ -23,7 +21,5 @@ unix:!macx: LIBS += -L$$PWD/../depends/lib -lExtraction \
                     -L/usr/local/lib -lafcpu
 INCLUDEPATH += $$PWD/../depends/includes
 INCLUDEPATH += $$PWD/../preprocessor
-INCLUDEPATH += $$PWD/../client
-DEPENDPATH += $$PWD/../client
 
 DEFINES += "SRC_DIR=\\\"$$_PRO_FILE_PWD_\\\""

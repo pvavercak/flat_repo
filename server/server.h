@@ -12,7 +12,6 @@
 #include "../extractor/extraction_caffenetwork.h"
 #include "databaseconnection.h"
 #include "preprocessing.h"
-#include "user.hpp"
 
 class Server : public QTcpServer
 {
@@ -23,14 +22,9 @@ private:
     QByteArray m_receivedTemplate;
     std::shared_ptr<Extraction> m_extractor;
     std::shared_ptr<Preprocessing> m_preprocessing;
-    int m_messageCounter;
     int m_expectingSize;
     QString m_certificate;
     QString m_key;
-    int m_messageSize;
-    quint8 m_receivedUserFingersCount;
-    fingers m_receivedUserFingers;
-    User currentUser;
 
     //private methods
     bool checkIp(QString &addr);

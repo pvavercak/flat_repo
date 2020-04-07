@@ -7,18 +7,15 @@
 #include <QtMath>
 
 Server::Server(QObject *parent) :
-    QTcpServer(parent),     
+    QTcpServer(parent),
     m_db(std::shared_ptr<DatabaseConnection>(new DatabaseConnection())),
+    m_receivedTemplate{},
     m_extractor(std::shared_ptr<Extraction>(new Extraction())),
     m_preprocessing(std::shared_ptr<Preprocessing>(new Preprocessing())),
-    m_messageCounter{0},
     m_expectingSize{-1},
     m_certificate(QString(SRC_DIR) + "/certificates/server.cert.pem"),
-    m_key(QString(SRC_DIR) + "/certificates/server.key.pem"),
-    m_receivedUserFingers(0),
-    currentUser()
+    m_key(QString(SRC_DIR) + "/certificates/server.key.pem")
 {
-    m_receivedTemplate.clear();
     m_extractor.get()->setCPUOnly(true);    
     connect(m_preprocessing.get(), SIGNAL(preprocessingDoneSignal(PREPROCESSING_RESULTS)), this, SLOT(onPreprocessingDoneSlot(PREPROCESSING_RESULTS)));
     connect(m_preprocessing.get(), SIGNAL(preprocessingErrorSignal(int)), this, SLOT(onPreprocessingErrorSlot(int)));
@@ -95,7 +92,7 @@ void Server::receivedMessage()
         m_receivedTemplate.push_back(r);
         int operation{0};
         deserializeCurrentlyReceivedUser(&operation);
-        qDebug() << m_receivedTemplate.size() << " against expecting: " << m_expectingSize;
+        qDebug() << "Received: " << m_receivedTemplate.size() << " against expecting: " << m_expectingSize;
         m_expectingSize = -1;
         m_receivedTemplate.clear();
     } else {
@@ -190,7 +187,7 @@ void Server::deserializeCurrentlyReceivedUser(int* operation)
     QDataStream tempStream(inputBytes);
     int sz{0}, op{0};
     quint8 fpcount{0};
-    fingers fngrs(0);
+    QVector<QVector<unsigned char>> fngrs(0);
     tempStream >> sz >> op >> fpcount >> fngrs;
     *operation = op;
 }
