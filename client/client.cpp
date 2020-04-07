@@ -87,21 +87,44 @@ void Client::newUser()
     m_user.removeAllFingers();
 }
 
-bool Client::enrollUser()
+bool Client::sendProbeUser(int operation)
 {
     if(m_socket.get()->isEncrypted()){
         QByteArray serialization_buffer{};
-        m_user.serializeUser(serialization_buffer);
-        qint64 nic = m_socket.get()->write(serialization_buffer);
-        qDebug() << nic;
-//        if(serialization_buffer.size() != m_socket.get()->write(serialization_buffer)){
-//            return false;
-//        }
+        m_user.serializeUser(serialization_buffer, operation);
+        if(serialization_buffer.size() != m_socket.get()->write(serialization_buffer)){
+            return false;
+        }
     } else {
         return false;
     }
 
     return true;
+}
+
+void Client::sendBadMessage()
+{
+    qDebug() << m_socket.get()->write("vlkjdnvdsjnvsdjn");
+}
+
+void Client::enrollUser()
+{
+    // 0 for registration
+    if (sendProbeUser(0)){
+        emit updateLog("Status: User registration");
+    } else {
+        emit updateLog("Error: User registration failed");
+    }
+}
+
+void Client::identifyUser()
+{
+    // 1 for identification
+    if (sendProbeUser(1)){
+        emit updateLog("Status: User identification");
+    } else {
+        emit updateLog("Error: User identification failed");
+    }
 }
 
 bool Client::processInputFinger()

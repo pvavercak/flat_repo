@@ -31,7 +31,7 @@ public:
     const quint8& getFingersCount();
 
     // below functions return no type
-    void serializeUser(QByteArray& outBuffer);
+    void serializeUser(QByteArray& outBuffer, int operation);
     void deserializeUser(const QByteArray& inBuffer, User* newUser);
 
     // below functions return misc types

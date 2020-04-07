@@ -84,18 +84,31 @@ void Server::receivedMessage()
     QSslSocket *source = qobject_cast<QSslSocket*>(sender());
     qint64 incomingBytes =  source->bytesAvailable();
     QByteArray r = source->readAll();
+    qDebug() <<  source->bytesAvailable();
     if (-1 == m_expectingSize) {
         QDataStream incommingStream(&r, QIODevice::ReadOnly);
         incommingStream >> m_expectingSize;
     }
     if (m_expectingSize > m_receivedTemplate.size() + incomingBytes) {
         m_receivedTemplate.push_back(r);
-    } else {
+    } else if (m_expectingSize == m_receivedTemplate.size() + incomingBytes){
         m_receivedTemplate.push_back(r);
-        deserializeCurrentlyReceivedUser(r);
+        int operation{0};
+        deserializeCurrentlyReceivedUser(&operation);
         qDebug() << m_receivedTemplate.size() << " against expecting: " << m_expectingSize;
         m_expectingSize = -1;
         m_receivedTemplate.clear();
+    } else {
+        m_expectingSize = -1;
+        m_receivedTemplate.clear();
+        emit updateLog("Error: Something went wrong when receiving user from client.");
+        QTextStream streamErrorMsg;
+        streamErrorMsg << "Error: Something went wrong when receiving user from client:\n";
+        streamErrorMsg << "\tExpected size of user: " << m_expectingSize << "\n";
+        streamErrorMsg << "\tActual size: " << r.size();
+        QString errorMsg;
+        streamErrorMsg >> errorMsg;
+        emit updateLog(errorMsg);
     }
 }
 
@@ -171,14 +184,15 @@ void Server::onExtractionErrorSlot(int error)
 //    pixmap.save("/home/pva/Desktop/drawedmins.png");
 //}
 
-void Server::deserializeCurrentlyReceivedUser(QByteArray arr)
+void Server::deserializeCurrentlyReceivedUser(int* operation)
 {
     QByteArray inputBytes = m_receivedTemplate;
     QDataStream tempStream(inputBytes);
-    int sz{0};
+    int sz{0}, op{0};
     quint8 fpcount{0};
     fingers fngrs(0);
-    tempStream >> sz >> fpcount >> fngrs;
+    tempStream >> sz >> op >> fpcount >> fngrs;
+    *operation = op;
 }
 
 void Server::onSslErrorSlot(const QList<QSslError> &errorList)

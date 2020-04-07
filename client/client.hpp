@@ -32,8 +32,11 @@ public:
     bool addFingerFromScanner();
     bool addFingerFromFile(const QString& imagePath);
     void newUser();
-    bool enrollUser();
+    void enrollUser();
+    void identifyUser();
     bool processInputFinger();
+    bool sendProbeUser(int operation);
+    void sendBadMessage();
 signals:
     void connected();
     void loggedIn();

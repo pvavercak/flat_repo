@@ -66,3 +66,13 @@ void ClientGUI::on_clearUserButton_pressed()
 {
     m_client.get()->deleteCurrentlyEnrollingUser();
 }
+
+void ClientGUI::on_identifyButton_pressed()
+{
+    m_client.get()->identifyUser();
+}
+
+void ClientGUI::on_addFromFileButton_pressed()
+{
+    m_client.get()->sendBadMessage();
+}

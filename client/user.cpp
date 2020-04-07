@@ -37,11 +37,16 @@ const quint8 &User::getFingersCount()
     return this->fingers_count;
 }
 
-void User::serializeUser(QByteArray &outBuffer)
+/**
+ * @brief User::serializeUser
+ * @param outBuffer
+ * @param operation 0 means registration, 1 means identification
+ */
+void User::serializeUser(QByteArray &outBuffer, int operation)
 {
     QDataStream serialization_stream(&outBuffer, QIODevice::WriteOnly);
     serialization_stream.setVersion(QDataStream::Qt_5_9);
-    serialization_stream << int(0);
+    serialization_stream << int(0) << operation;
     serialization_stream << fingers_count << stored_fingers;
     serialization_stream.device()->seek(0);
     serialization_stream << outBuffer.size();

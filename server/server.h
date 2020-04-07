@@ -36,7 +36,7 @@ private:
     bool checkIp(QString &addr);
     void preprocessing();
 //    void minutiaeVisualisation(QByteArray fingerprint, QVector<MINUTIA> minutiaeList);
-    void deserializeCurrentlyReceivedUser(QByteArray arr);
+    void deserializeCurrentlyReceivedUser(int* operation);
 public:
     explicit Server(QObject *parent = nullptr);
     ~Server() override;

@@ -28,6 +28,10 @@ private slots:
 
     void on_clearUserButton_pressed();
 
+    void on_identifyButton_pressed();
+
+    void on_addFromFileButton_pressed();
+
 private:
     std::shared_ptr<Client> m_client;
     Ui::ClientGUI *m_ui;
