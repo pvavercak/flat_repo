@@ -2,8 +2,7 @@
 #define CLIENTGUI_H
 
 #include <QMainWindow>
-#include <client.h>
-#include <fphandler.h>
+#include <client.hpp>
 #include <memory>
 
 namespace Ui {
@@ -20,13 +19,21 @@ private slots:
     void connectedToServer();        
     void disconnectedFromServer();
     void error(QAbstractSocket::SocketError socketError);
-    void on_send_pressed();
-    void on_scan_pressed();
     void on_connectToServer_pressed();
     void on_disconnect_pressed();
+    void on_scan_pressed();
+    void on_newUserButton_pressed();
+
+    void on_registerButton_pressed();
+
+    void on_clearUserButton_pressed();
+
+    void on_identifyButton_pressed();
+
+    void on_addFromFileButton_pressed();
 
 private:
     std::shared_ptr<Client> m_client;
-    std::unique_ptr<Ui::ClientGUI> m_ui;
+    Ui::ClientGUI *m_ui;
 };
 #endif // CLIENTGUI_H
