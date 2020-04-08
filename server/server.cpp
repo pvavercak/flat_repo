@@ -81,7 +81,6 @@ void Server::receivedMessage()
     QSslSocket *source = qobject_cast<QSslSocket*>(sender());
     qint64 incomingBytes =  source->bytesAvailable();
     QByteArray r = source->readAll();
-    qDebug() <<  source->bytesAvailable();
     if (-1 == m_expectingSize) {
         QDataStream incommingStream(&r, QIODevice::ReadOnly);
         incommingStream >> m_expectingSize;
@@ -148,8 +147,7 @@ void Server::onPreprocessingErrorSlot(int error)
 
 void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
 {
-    emit updateLog("Status: Extraction finished");    
-//    minutiaeVisualisation(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()), extractionResults.minutiaePredictedFixed);
+    emit updateLog("Status: Extraction finished");
 }
 
 void Server::onExtractionErrorSlot(int error)
@@ -157,38 +155,18 @@ void Server::onExtractionErrorSlot(int error)
     emit updateLog("Error: Extractor returned " + QString::number(error));
 }
 
-//void Server::minutiaeVisualisation(QByteArray fingerprint, QVector<MINUTIA> minutiaeList)
-//{
-//    QImage fingerImage(reinterpret_cast<unsigned char*>(fingerprint.data()),320, 480, QImage::Format_Grayscale8);
-//    QPixmap pixmap = QPixmap::fromImage(fingerImage);
-//    QPainter painter(&pixmap);
-//    QPen pen;
-//    pen.setWidth(1);
-//    for (const auto& point : minutiaeList){
-//        if (point.quality > 65) {
-//            pen.setColor(QColor(0, 100 + point.quality, 0));
-//        } else {
-//            pen.setColor(QColor(200 - point.quality, 0, 0));
-//        }
-//        painter.setPen(pen);
-//        painter.drawRect(point.xy.x() - 3, point.xy.y() - 3, 10, 10);
-//        QPoint p1(point.xy);
-//        QPoint p2(point.xy.x() + static_cast<int>(qCos(point.angle) * 20), point.xy.y() + static_cast<int>(qSin(point.angle) *20));
-//        painter.drawLine(p1, p2);
-//    }
-//    painter.end();
-//    sendImage(pixmap);
-//    pixmap.save("/home/pva/Desktop/drawedmins.png");
-//}
-
 void Server::deserializeCurrentlyReceivedUser(int* operation)
 {
     QByteArray inputBytes = m_receivedTemplate;
     QDataStream tempStream(inputBytes);
     int sz{0}, op{0};
     quint8 fpcount{0};
-    QVector<QVector<unsigned char>> fngrs(0);
-    tempStream >> sz >> op >> fpcount >> fngrs;
+    QVector<QImage> receivedFingersVector;
+    tempStream >> sz >> op >> fpcount >> receivedFingersVector;
+    for (QImage singleImage: receivedFingersVector) {
+        singleImage = singleImage.convertToFormat(QImage::Format_Grayscale8);
+        singleImage.save("/home/pva/Desktop/serverside_bmpimage.png", "png");
+    }
     *operation = op;
 }
 

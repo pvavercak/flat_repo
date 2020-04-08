@@ -51,8 +51,8 @@ bool Client::deleteCurrentlyEnrollingUser()
 bool Client::addFingerFromScanner()
 {
     quint8 prev_count{m_user.getFingersCount()};
-    finger f = readFingerFromScanner();
-    if (f.isEmpty()){
+    QImage f = readFingerFromScanner();
+    if (f.isNull()){
         return false;
     }
 
@@ -68,8 +68,8 @@ bool Client::addFingerFromScanner()
 bool Client::addFingerFromFile(const QString &imagePath)
 {
     quint8 prev_count{m_user.getFingersCount()};
-    finger f = readFingerFromImage(imagePath);
-    if (f.isEmpty()) {
+    QImage f = readFingerFromImage(imagePath);
+    if (f.isNull()) {
         return false;
     }
 
@@ -196,22 +196,25 @@ bool Client::checkIp(const QString &receivedIp)
     }
 }
 
-finger Client::readFingerFromScanner()
+QImage Client::readFingerFromScanner()
 {
     CHECK_ERROR(UFS_ClearCaptureImageBuffer(m_scanner));
     CHECK_ERROR(UFS_CaptureSingleImage(m_scanner));
     int width{0}, height{0}, resolution{0};
     CHECK_ERROR(UFS_GetCaptureImageBufferInfo(m_scanner, &width, &height, &resolution));
-    finger outFinger(width * height);
-    UFS_GetCaptureImageBuffer(m_scanner, outFinger.data());
-    return outFinger;
+    QVector<uchar> bufFinger(width * height);
+    UFS_GetCaptureImageBuffer(m_scanner, bufFinger.data());
+    QImage outFingerImage(bufFinger.data(), width, height, QImage::Format_Grayscale8);
+    outFingerImage.save("/home/pva/Desktop/clientside_bmpimage.png", "png");
+    outFingerImage = outFingerImage.convertToFormat(QImage::Format_ARGB32);
+    return outFingerImage;
 }
 
-finger Client::readFingerFromImage(QString imagePath)
+QImage Client::readFingerFromImage(QString imagePath)
 {
-    finger outFinger(0);
+    QImage outFingerImage;
     if (!QFile::exists(imagePath)) {
-        return outFinger;
+        return outFingerImage;
     }
 
     QByteArray imageFormat{};
@@ -219,15 +222,10 @@ finger Client::readFingerFromImage(QString imagePath)
         QImageReader ireader(imagePath);
         imageFormat = ireader.format();
     }
-    if (imageFormat.isEmpty()) {
-        return outFinger;
-    }
-    {
-        QImage image(imagePath, imageFormat.data());
-        outFinger.resize(image.byteCount());
-        memcpy(outFinger.data(), image.bits(), static_cast<size_t> (image.byteCount()));
-    }
-    return outFinger;
+    QImage image(imagePath, imageFormat.data());
+    image = image.convertToFormat(QImage::Format_ARGB32); // just for make sure its the same format
+
+    return outFingerImage;
 }
 
 void Client::CHECK_ERROR(UFS_STATUS err){
