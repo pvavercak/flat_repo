@@ -1,9 +1,6 @@
 [submodule "extractor"]
 	path = extractor
 	url = https://github.com/pvavercak/openfinger-extractor.git
-[submodule "preprocessor"]
-	path = preprocessor
-	url = git@github.com:pvavercak/preprocessor.git
 [submodule "matcher"]
 	path = matcher
 	url = git@github.com:pvavercak/matcher.git
