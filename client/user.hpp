@@ -4,9 +4,7 @@
 #include <QDataStream>
 #include <QIODevice>
 #include <QVector>
-
-typedef QVector<unsigned char> finger;
-typedef QVector<finger> fingers;
+#include <QImage>
 
 /**
  * @brief The User class
@@ -17,15 +15,15 @@ class User
 {
 private:
     quint8 fingers_count;
-    fingers stored_fingers;
+    QVector<QImage> stored_fingers;
 
 public:
     User();
-    User(const quint8& fingers_count, const fingers& stored_fingers);
+    User(const quint8& fingers_count, const QVector<QImage>& stored_fingers);
     User(const User& other);
 
     // below functions return a number of fingerprints that will be stored in user after a function ends
-    quint8 addFinger(const finger& fp);
+    quint8 addFinger(const QImage& fp);
     quint8 removeFinger(const quint8 index);
     quint8 removeAllFingers();
     const quint8& getFingersCount();
@@ -35,7 +33,7 @@ public:
     void deserializeUser(const QByteArray& inBuffer, User* newUser);
 
     // below functions return misc types
-    finger getFingerOnIndex(const quint8 index); // returns empty vector if index is not valid
+    QImage getFingerOnIndex(const quint8 index); // returns empty vector if index is not valid
 };
 
 #endif // USER_HPP

@@ -8,10 +8,16 @@
 #include <memory>
 #include <vector>
 #include <string>
+#include <QImage>
 #include "../extractor/extraction.h"
 #include "../extractor/extraction_caffenetwork.h"
 #include "databaseconnection.h"
 #include "preprocessing.h"
+
+#define HEADER_LENGHT 24
+#define FINGER_VIEW_HEADER_LENGTH 4
+#define ISO_MINUTIA_LENGTH 6
+#define EXTENDED_DATA_BLOCK_LENGTH 2
 
 class Server : public QTcpServer
 {
@@ -44,10 +50,11 @@ private slots:
     void disconnectedClientSlot();
     void onStateChanged(QAbstractSocket::SocketState state);
     void onErrorSlot(QAbstractSocket::SocketError error);
-    void onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingResults);
+    void onPreprocessingDoneSlot(QMap<QString, PREPROCESSING_RESULTS> preprocessingResults);
     void onPreprocessingErrorSlot(int error);
     void onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults);
-    void onExtractionErrorSlot(int error);    
+    void onExtractionErrorSlot(int error);
+    void onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS> resultMap);
     void onSslErrorSlot(const QList<QSslError> &errorList);
     void onEncryptedSlot();
     void incomingConnection(qintptr socketDescriptor) override;

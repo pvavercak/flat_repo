@@ -16,12 +16,17 @@ Server::Server(QObject *parent) :
     m_certificate(QString(SRC_DIR) + "/certificates/server.cert.pem"),
     m_key(QString(SRC_DIR) + "/certificates/server.key.pem")
 {
-    m_extractor.get()->setCPUOnly(true);    
-    connect(m_preprocessing.get(), SIGNAL(preprocessingDoneSignal(PREPROCESSING_RESULTS)), this, SLOT(onPreprocessingDoneSlot(PREPROCESSING_RESULTS)));
+    m_extractor.get()->setCPUOnly(true);
+    m_extractor.get()->setFeatures(true);
+    m_preprocessing.get()->setCPUOnly(true);
+    qRegisterMetaType<QMap<QString, PREPROCESSING_RESULTS>>("QMap<QString, PREPROCESSING_RESULTS>");
+    connect(m_preprocessing.get(), SIGNAL(preprocessingSequenceDoneSignal(QMap<QString, PREPROCESSING_RESULTS>)), this, SLOT(onPreprocessingDoneSlot(QMap<QString, PREPROCESSING_RESULTS>)));
     connect(m_preprocessing.get(), SIGNAL(preprocessingErrorSignal(int)), this, SLOT(onPreprocessingErrorSlot(int)));
     qRegisterMetaType<EXTRACTION_RESULTS >("EXTRACTION_RESULTS");
     connect(m_extractor.get(), SIGNAL(extractionDoneSignal(EXTRACTION_RESULTS)), this, SLOT(onExtractionDoneSlot(EXTRACTION_RESULTS)));
-    connect(m_extractor.get(), SIGNAL(extractionErrorSignal(int)), this, SLOT(onExtractionErrorSlot(int)));    
+    qRegisterMetaType<QMap<QString, EXTRACTION_RESULTS>>("QMap<QString, EXTRACTION_RESULTS>");
+    connect(m_extractor.get(), SIGNAL(extractionSequenceDoneSignal(QMap<QString, EXTRACTION_RESULTS>)), this, SLOT(onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS>)));
+    connect(m_extractor.get(), SIGNAL(extractionErrorSignal(int)), this, SLOT(onExtractionErrorSlot(int)));
 }
 
 Server::~Server()
@@ -81,7 +86,6 @@ void Server::receivedMessage()
     QSslSocket *source = qobject_cast<QSslSocket*>(sender());
     qint64 incomingBytes =  source->bytesAvailable();
     QByteArray r = source->readAll();
-    qDebug() <<  source->bytesAvailable();
     if (-1 == m_expectingSize) {
         QDataStream incommingStream(&r, QIODevice::ReadOnly);
         incommingStream >> m_expectingSize;
@@ -92,7 +96,7 @@ void Server::receivedMessage()
         m_receivedTemplate.push_back(r);
         int operation{0};
         deserializeCurrentlyReceivedUser(&operation);
-        qDebug() << "Received: " << m_receivedTemplate.size() << " against expecting: " << m_expectingSize;
+//        qDebug() << "Received: " << m_receivedTemplate.size() << " against expecting: " << m_expectingSize;
         m_expectingSize = -1;
         m_receivedTemplate.clear();
     } else {
@@ -134,9 +138,12 @@ void Server::onErrorSlot(QAbstractSocket::SocketError error)
     emit updateLog("Error: " + QString(static_cast<unsigned char>(error)));
 }
 
-void Server::onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingResults)
+void Server::onPreprocessingDoneSlot(QMap<QString, PREPROCESSING_RESULTS> preprocessingResults)
 {
-    emit updateLog("Status: preprocessing done");    
+    emit updateLog("Status: preprocessing done");
+//    for(auto& mapIterator : preprocessingResults) {
+//        cv::imshow("From Preprocessing", mapIterator.imgOriginal);
+//    }
     m_extractor.get()->loadInput(preprocessingResults);
     m_extractor.get()->start();
 }
@@ -148,8 +155,8 @@ void Server::onPreprocessingErrorSlot(int error)
 
 void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
 {
-    emit updateLog("Status: Extraction finished");    
-//    minutiaeVisualisation(m_receivedTemplate.mid(HEADERSIZE, m_receivedTemplate.size()), extractionResults.minutiaePredictedFixed);
+    emit updateLog("Status: Extraction finished");
+    qDebug() << extractionResults.minutiaeCN.size();
 }
 
 void Server::onExtractionErrorSlot(int error)
@@ -157,29 +164,17 @@ void Server::onExtractionErrorSlot(int error)
     emit updateLog("Error: Extractor returned " + QString::number(error));
 }
 
-//void Server::minutiaeVisualisation(QByteArray fingerprint, QVector<MINUTIA> minutiaeList)
-//{
-//    QImage fingerImage(reinterpret_cast<unsigned char*>(fingerprint.data()),320, 480, QImage::Format_Grayscale8);
-//    QPixmap pixmap = QPixmap::fromImage(fingerImage);
-//    QPainter painter(&pixmap);
-//    QPen pen;
-//    pen.setWidth(1);
-//    for (const auto& point : minutiaeList){
-//        if (point.quality > 65) {
-//            pen.setColor(QColor(0, 100 + point.quality, 0));
-//        } else {
-//            pen.setColor(QColor(200 - point.quality, 0, 0));
-//        }
-//        painter.setPen(pen);
-//        painter.drawRect(point.xy.x() - 3, point.xy.y() - 3, 10, 10);
-//        QPoint p1(point.xy);
-//        QPoint p2(point.xy.x() + static_cast<int>(qCos(point.angle) * 20), point.xy.y() + static_cast<int>(qSin(point.angle) *20));
-//        painter.drawLine(p1, p2);
-//    }
-//    painter.end();
-//    sendImage(pixmap);
-//    pixmap.save("/home/pva/Desktop/drawedmins.png");
-//}
+void Server::onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS> resultMap)
+{
+    QVector<QVector<uchar>> isoTemplates;
+    for(EXTRACTION_RESULTS result : resultMap){
+        int isoTplSize = HEADER_LENGHT + (FINGER_VIEW_HEADER_LENGTH + (result.minutiaePredicted.size() * ISO_MINUTIA_LENGTH) + EXTENDED_DATA_BLOCK_LENGTH);
+        qDebug() << "From server: size == " << isoTplSize;
+        QVector<uchar> isoTpl(isoTplSize);
+        memcpy(isoTpl.data(), result.minutiaeISO, static_cast<size_t>(isoTplSize));
+        isoTemplates.push_back(isoTpl);
+    }
+}
 
 void Server::deserializeCurrentlyReceivedUser(int* operation)
 {
@@ -187,9 +182,23 @@ void Server::deserializeCurrentlyReceivedUser(int* operation)
     QDataStream tempStream(inputBytes);
     int sz{0}, op{0};
     quint8 fpcount{0};
-    QVector<QVector<unsigned char>> fngrs(0);
-    tempStream >> sz >> op >> fpcount >> fngrs;
+    QVector<QImage> receivedFingersVector{};
+    tempStream >> sz >> op >> fpcount >> receivedFingersVector;
     *operation = op;
+    QVector<cv::Mat> matVector{};
+    for (const QImage& singleImage: receivedFingersVector) {
+        cv::Mat singleMat(singleImage.height(), singleImage.width(), CV_8UC4, (void*)(singleImage.bits()), static_cast<size_t>(singleImage.bytesPerLine()));
+        matVector.push_back(singleMat);
+//        cv::imshow("received from client", singleMat);
+//        singleImage.save("/home/pva/Desktop/serverside_bmpimage.png", "png");
+    }
+    if (0 == op) {
+        qDebug() << "Registering user with " << fpcount << " fingerprints";
+        m_preprocessing.get()->loadInput(matVector);
+        m_preprocessing.get()->start();
+    } else if (1 == op) {
+        qDebug() << "Identifying user";
+    }
 }
 
 void Server::onSslErrorSlot(const QList<QSslError> &errorList)

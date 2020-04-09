@@ -62,8 +62,8 @@ private:
 
     //private methods
     bool checkIp(const QString &receivedIp);
-    finger readFingerFromScanner();
-    finger readFingerFromImage(QString imagePath);
+    QImage readFingerFromScanner();
+    QImage readFingerFromImage(QString imagePath);
     void CHECK_ERROR(UFS_STATUS err);
 };
 

@@ -2,7 +2,7 @@
 
 User::User() : fingers_count{0}, stored_fingers(0) {} // default
 
-User::User(const quint8 &fingers_count, const fingers &stored_fingers)
+User::User(const quint8 &fingers_count, const QVector<QImage> &stored_fingers)
 {
     this->fingers_count = fingers_count;
     this->stored_fingers = stored_fingers;
@@ -14,7 +14,7 @@ User::User(const User &other)
     this->stored_fingers = other.stored_fingers;
 }
 
-quint8 User::addFinger(const finger &fp)
+quint8 User::addFinger(const QImage &fp)
 {
     stored_fingers.push_back(fp);
     return fingers_count = static_cast<quint8> (stored_fingers.size());
@@ -57,7 +57,7 @@ void User::deserializeUser(const QByteArray &inBuffer, User *newUser)
     if (!newUser) return;
     QDataStream deserialization_stream(inBuffer);
     quint8 fpcount{0};
-    fingers fps{0};
+    QVector<QImage> fps{0};
     deserialization_stream >> fpcount >> fps;
     newUser->fingers_count = fpcount;
     newUser->stored_fingers = fps;
