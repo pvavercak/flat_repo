@@ -4,3 +4,6 @@
 [submodule "preprocessor"]
 	path = preprocessor
 	url = git@github.com:pvavercak/preprocessor.git
+[submodule "matcher"]
+	path = matcher
+	url = git@github.com:pvavercak/matcher.git
