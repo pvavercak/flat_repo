@@ -1,6 +1,14 @@
-# IDENTIFICATION OF FINGERPRINTS FLAT REPOSITORY
+# ENROLLMENT/IDENTIFICATION OF FINGERPRINTS FLAT REPOSITORY
 
-Fingerprint identification and verification algorithm
+Linking openfinger libraries to one single application.
+
+
+OPENFINGER LIBRARIES:
+Preprocessing
+Extration
+Matcher
+
+The main goal is to execute an identification of a probe fingerprint against a fingerprint database including probe's preprocessing and extraction.
 
 
 Repository for my bachelor's prject
