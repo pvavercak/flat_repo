@@ -18,6 +18,7 @@ FORMS += server.ui
 
 unix:!macx: LIBS += -L$$PWD/../dep/libs -lExtraction \
                     -L$$PWD/../dep/libs -lPreprocessing \
+                    -L$$PWD/../dep/libs -lMatcher \
                     -L/usr/local/lib -lafcpu
 
 INCLUDEPATH += $$PWD/../dep/includes

@@ -12,6 +12,7 @@ Server::Server(QObject *parent) :
     m_receivedTemplate{},
     m_extractor(std::shared_ptr<Extraction>(new Extraction())),
     m_preprocessing(std::shared_ptr<Preprocessing>(new Preprocessing())),
+    m_matcher(std::shared_ptr<Matcher>(new Matcher())),
     m_expectingSize{-1},
     m_certificate(QString(SRC_DIR) + "/certificates/server.cert.pem"),
     m_key(QString(SRC_DIR) + "/certificates/server.key.pem")
@@ -29,9 +30,7 @@ Server::Server(QObject *parent) :
     connect(m_extractor.get(), SIGNAL(extractionErrorSignal(int)), this, SLOT(onExtractionErrorSlot(int)));
 }
 
-Server::~Server()
-{
-}
+Server::~Server() {}
 
 void Server::incomingConnection(qintptr socketDescriptor)
 {

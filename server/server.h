@@ -6,6 +6,7 @@
 #include <QSslError>
 #include <QPixmap>
 #include <memory>
+#include <regex>
 #include <vector>
 #include <string>
 #include <QImage>
@@ -14,6 +15,7 @@
 #include "preprocessing.h"
 #include "extraction.h"
 #include "extraction_caffenetwork.h"
+#include "matcher.h"
 
 
 #define HEADER_LENGHT 24
@@ -30,6 +32,7 @@ private:
     QByteArray m_receivedTemplate;
     std::shared_ptr<Extraction> m_extractor;
     std::shared_ptr<Preprocessing> m_preprocessing;
+    std::shared_ptr<Matcher> m_matcher;
     int m_expectingSize;
     QString m_certificate;
     QString m_key;
