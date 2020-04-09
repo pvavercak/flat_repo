@@ -16,10 +16,10 @@ HEADERS += server.h \
 
 FORMS += server.ui
 
-unix:!macx: LIBS += -L$$PWD/../depends/lib -lExtraction \
-                    -L$$PWD/../depends/lib -lPreprocessing \
+unix:!macx: LIBS += -L$$PWD/../dep/libs -lExtraction \
+                    -L$$PWD/../dep/libs -lPreprocessing \
                     -L/usr/local/lib -lafcpu
-INCLUDEPATH += $$PWD/../depends/includes
-INCLUDEPATH += $$PWD/../preprocessor
+
+INCLUDEPATH += $$PWD/../dep/includes
 
 DEFINES += "SRC_DIR=\\\"$$_PRO_FILE_PWD_\\\""

@@ -9,10 +9,12 @@
 #include <vector>
 #include <string>
 #include <QImage>
-#include "../extractor/extraction.h"
-#include "../extractor/extraction_caffenetwork.h"
 #include "databaseconnection.h"
+
 #include "preprocessing.h"
+#include "extraction.h"
+#include "extraction_caffenetwork.h"
+
 
 #define HEADER_LENGHT 24
 #define FINGER_VIEW_HEADER_LENGTH 4
