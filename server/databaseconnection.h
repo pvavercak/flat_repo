@@ -11,7 +11,6 @@
 #include <QSqlQuery>
 #include <QDebug>
 #include <QMultiMap>
-#include <memory>
 
 class DatabaseConnection : public QObject
 {

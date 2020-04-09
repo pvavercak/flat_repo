@@ -48,34 +48,34 @@ void ServerGUI::updateClientListSlot(QVector<QSslSocket*> sockets)
 
 void ServerGUI::on_dbTestButton_pressed()
 {
-  DatabaseConnection c;
-  if (c.setDb()) {
-    qDebug() << "db opened";
-  } else {
-    qDebug() << "db error";
-    return;
-  }
+//  DatabaseConnection c;
+//  if (c.setDb()) {
+//    qDebug() << "db opened";
+//  } else {
+//    qDebug() << "db error";
+//    return;
+//  }
 
-  QVector<uchar> isoTpl;
-  for (int b = 121; b > 64; --b ){
-    isoTpl.push_back(static_cast<uchar>(b));
-  }
+//  QVector<uchar> isoTpl;
+//  for (int b = 121; b > 64; --b ){
+//    isoTpl.push_back(static_cast<uchar>(b));
+//  }
 
-  QVector<QVector<uchar>> nic;
-  nic.push_back(isoTpl);
-  c.registerUserToDbWithId(nic, 16);
+//  QVector<QVector<uchar>> nic;
+//  nic.push_back(isoTpl);
+//  c.registerUserToDb(nic);
 }
 
 void ServerGUI::on_dbGetButton_pressed()
 {
-  DatabaseConnection c;
-  if (c.setDb()) {
-    qDebug() << "db opened";
-  } else {
-    qDebug() << "db error";
-    return;
-  }
+//  DatabaseConnection c;
+//  if (c.setDb()) {
+//    qDebug() << "db opened";
+//  } else {
+//    qDebug() << "db error";
+//    return;
+//  }
 
-  QMultiMap<QString, QVector<uchar>> allUsers;
-  c.getAllUsersFromDb(&allUsers);
+//  QMultiMap<QString, QVector<uchar>> allUsers;
+//  c.getAllUsersFromDb(&allUsers);
 }
