@@ -128,6 +128,20 @@
        </widget>
       </item>
       <item>
+       <widget class="QPushButton" name="dbTestButton">
+        <property name="text">
+         <string>Db Test</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QPushButton" name="dbGetButton">
+        <property name="text">
+         <string>Db Get Test</string>
+        </property>
+       </widget>
+      </item>
+      <item>
        <widget class="QGroupBox" name="clientListGroup">
         <property name="title">
          <string>Clients</string>
