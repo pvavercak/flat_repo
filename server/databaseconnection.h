@@ -3,25 +3,30 @@
 
 #include <QObject>
 #include <QSqlDatabase>
-#include <memory>
+#include <QSqlError>
+#include <QSqlResult>
+#include <QDataStream>
+#include <QVector>
+#include <QByteArray>
+#include <QSqlQuery>
+#include <QDebug>
+#include <QMultiMap>
 
 class DatabaseConnection : public QObject
 {
-    Q_OBJECT
+  Q_OBJECT
 private:
-    QSqlDatabase database;
-    QString dbPath;
-    bool createTable();
+  QSqlDatabase m_database;
+  bool userIdExists(const quint64 id);
+  void userTemplateToBytes(const QVector<QVector<uchar> > &userData, QByteArray* outArray);
 public:
-    explicit DatabaseConnection(QObject *parent = nullptr);
-    ~DatabaseConnection();
-    bool setDb();
-    int getLastUserId();
-    bool writeTemplate(QByteArray templ, int userId = -1);
-
-signals:
-
-public slots:
+  explicit DatabaseConnection(QObject *parent = nullptr);
+  ~DatabaseConnection();
+  bool setDb(const QString& username, const QString& pass, const QString& host, const QString& dbname);
+  bool setDb();
+  bool registerUserToDb(const QVector<QVector<uchar>>& userData);
+  bool registerUserToDbWithId(const QVector<QVector<uchar>>& userData, const quint64 id);
+  bool getUserTemplateByID(const quint64& userId, QVector<QVector<uchar>>* outUserTemplate);
+  bool getAllUsersFromDb(QMultiMap<QString, QVector<uchar>>* allUsers);
 };
-
 #endif // CONNECTION_H

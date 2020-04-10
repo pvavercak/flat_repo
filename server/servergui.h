@@ -8,27 +8,23 @@
 
 namespace Ui
 {
-    class Server;
+  class Server;
 }
-
 class ServerGUI : public QMainWindow
 {
-    Q_OBJECT
-
+  Q_OBJECT
 public:
-    explicit ServerGUI(QWidget *parent = 0);
-    ~ServerGUI();
+  explicit ServerGUI(QWidget *parent = nullptr);
+  ~ServerGUI();
 private slots:
-    void on_start_server_pressed();
-    void on_terminate_pressed();
-    void updateClientListSlot(QVector<QSslSocket*> sokets);
-signals:
-    void bla();
-
+  void on_start_server_pressed();
+  void on_terminate_pressed();
+  void updateClientListSlot(QVector<QSslSocket*> sokets);
+  void on_dbTestButton_pressed();
+  void on_dbGetButton_pressed();
 private:
-    std::shared_ptr<Ui::Server> m_ui;
-    std::shared_ptr<QTextEdit> m_console;
-    std::shared_ptr<Server> m_server;
+  std::shared_ptr<Ui::Server> m_ui;
+  std::shared_ptr<QTextEdit> m_console;
+  std::shared_ptr<Server> m_server;
 };
-
 #endif // SSLSERVER_H
