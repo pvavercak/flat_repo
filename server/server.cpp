@@ -12,7 +12,7 @@ Server::Server(QObject *parent) :
   m_key(QString(SRC_DIR) + "/certificates/server.key.pem")
 {
   m_extractor.get()->setCPUOnly(true);
-  m_extractor.get()->setFeatures(true);
+  m_extractor.get()->setFeatures(true, false, false);
   m_preprocessing.get()->setCPUOnly(true);
 
   qRegisterMetaType<QMap<QString, PREPROCESSING_RESULTS>>("QMap<QString, PREPROCESSING_RESULTS>");
@@ -33,7 +33,9 @@ Server::Server(QObject *parent) :
           this, SLOT(onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS>)));
   connect(m_extractor.get(), SIGNAL(extractionErrorSignal(int)), this, SLOT(onExtractionErrorSlot(int)));
 
-  connect(m_matcher.get(), SIGNAL(identificationDoneSignal(bool, QString, float)), this, SLOT(onIdentificationDoneSlot(bool, QString, float)));
+  connect(m_matcher.get(), SIGNAL(identificationDoneSignal(bool, QString, float)),
+          this, SLOT(onIdentificationDoneSlot(bool, QString, float)));
+  connect(m_matcher.get(), SIGNAL(matcherErrorSignal(int)), this, SLOT(onMatcherErrorSlot(int)));
 
   m_db.get()->setDb(); // default db configuration
 }
@@ -128,6 +130,11 @@ void Server::deserializeCurrentlyReceivedUser(int* operation)
   QVector<QImage> receivedFingersVector{};
   tempStream >> sz >> op >> fpcount >> receivedFingersVector;
   *operation = op;
+
+  if (0 == receivedFingersVector.size()){
+    emit updateLog("Warning: probe user is empty, skipping all operations");
+    return;
+  }
 
   if (0 == op) { // registration
     QVector<cv::Mat> matVector{};
@@ -225,9 +232,11 @@ void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
                 + (FINGER_VIEW_HEADER_LENGTH
                 + (extractionResults.minutiaePredicted.size() * ISO_MINUTIA_LENGTH)
                 + EXTENDED_DATA_BLOCK_LENGTH);
-  QVector<uchar> isoTemplate(isoTplSize);
-  memcpy(isoTemplate.data(), extractionResults.minutiaeISO, static_cast<size_t>(isoTplSize));
-  identifyUser(isoTemplate.data());
+//  uchar* allocatedUser = (uchar*)malloc(isoTplSize);
+//  memset(allocatedUser, 0, static_cast<size_t>(isoTplSize));
+//  memcpy(allocatedUser, extractionResults.minutiaeISO, static_cast<size_t>(isoTplSize));
+  identifyUser(extractionResults.minutiaeISO);
+  free(extractionResults.minutiaeISO);
 }
 
 void Server::onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS> resultMap)

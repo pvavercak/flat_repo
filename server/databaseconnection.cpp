@@ -122,13 +122,13 @@ bool DatabaseConnection::getAllUsersFromDb(QMultiMap<QString, QVector<uchar>> *a
     return false;
   } else {
     while (query.next()) {
-      quint64 currentUserId = static_cast<quint8>(query.value(0).toInt());
+      QString currentUserId = query.value(0).toString();
       QByteArray deserializationBuffer = query.value(1).toByteArray();
       QDataStream deserializationStream(&deserializationBuffer, QIODevice::ReadOnly);
-      QVector<QVector<uchar>> oneUserTemplate;
-      deserializationStream >> oneUserTemplate;
-      for (const auto& isoTemplate : oneUserTemplate) {
-        allUsers->insert(QString::number(currentUserId), isoTemplate);
+      QVector<QVector<uchar>> allUserTemplates;
+      deserializationStream >> allUserTemplates;
+      for (const auto& isoTemplate : allUserTemplates) {
+        allUsers->insert(currentUserId, isoTemplate);
       }
     }
   }
