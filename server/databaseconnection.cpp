@@ -32,20 +32,52 @@ bool DatabaseConnection::setDb()
   return true;
 }
 
-void DatabaseConnection::userTemplateToBytes(const QVector<QVector<uchar> > &userData, QByteArray* outArray)
+void DatabaseConnection::userTemplateToBytes(const QVector<QVector<MINUTIA> > &userData, QByteArray* outArray)
 {
   QDataStream userDataStream(outArray, QIODevice::WriteOnly);
   userDataStream.setVersion(QDataStream::Qt_5_9);
   userDataStream << userData;
 }
 
-bool DatabaseConnection::registerUserToDb(const QVector<QVector<uchar>>& userData)
+QDataStream& operator<<(QDataStream& _stream, const MINUTIA& _min) {
+  return _stream << _min.xy << _min.type << _min.angle << _min.quality << _min.imgWH;
+}
+
+QDataStream& operator<<(QDataStream& _stream, const QVector<MINUTIA>& _vec)
+{
+  _stream << static_cast<int>(_vec.size());
+  for(const auto& _min : _vec){
+    _stream << _min.xy << _min.type << _min.angle << _min.quality << _min.imgWH;
+  }
+  return _stream;
+}
+
+QDataStream& operator>>(QDataStream& _stream, MINUTIA& _min) {
+  return _stream >> _min.xy >> _min.type >> _min.angle >> _min.quality >> _min.imgWH;
+}
+
+QDataStream& operator>>(QDataStream& _stream, QVector<MINUTIA>& vec)
+{
+  int _sz{};
+  vec.clear();
+  _stream >> _sz;
+  vec.reserve(_sz);
+  MINUTIA _min{};
+  while(0 != _sz) {
+    _stream >> _min;
+    vec.push_back(_min);
+    --_sz;
+  }
+  return _stream;
+}
+
+bool DatabaseConnection::registerUserToDb(const QVector<QVector<MINUTIA>>& userData)
 {
   QByteArray userBinary{};
   userTemplateToBytes(userData, &userBinary);
   QSqlQuery query(m_database);
-  query.prepare("INSERT INTO user_templates (template) VALUES (?);");
-  query.bindValue(0, userBinary);
+  query.prepare("INSERT INTO user_templates (template) VALUES (:userBinary);");
+  query.bindValue(":userBinary", userBinary);
   if (!query.exec()) {
     qDebug() << query.lastError().text();
     return false;
@@ -61,7 +93,8 @@ bool DatabaseConnection::userIdExists(const quint64 id)
   if (!query.exec()) {
     qDebug() << "Error [SQL]: " << query.lastError().text();
     return true;
-  } else {
+  }
+  else {
     if (query.next()) {
       qDebug() << "Error: User with id " << id << " already registered";
       return true;
@@ -70,7 +103,7 @@ bool DatabaseConnection::userIdExists(const quint64 id)
   return false;
 }
 
-bool DatabaseConnection::registerUserToDbWithId(const QVector<QVector<uchar> > &userData, const quint64 id)
+bool DatabaseConnection::registerUserToDbWithId(const QVector<QVector<MINUTIA> > &userData, const quint64 id)
 {
   if (userIdExists(id)) {
     return false;
@@ -88,9 +121,13 @@ bool DatabaseConnection::registerUserToDbWithId(const QVector<QVector<uchar> > &
   return true;
 }
 
-bool DatabaseConnection::getUserTemplateByID(const quint64 &userId, QVector<QVector<uchar>>* outUserTemplate)
+bool DatabaseConnection::getUserTemplateByID(const quint64 &userId, QVector<QVector<MINUTIA>>* outUserTemplate)
 {
   if (!outUserTemplate) {
+    return false;
+  }
+  if (!userIdExists(userId)) {
+    qDebug() << "Error: user does not exist";
     return false;
   }
   QSqlQuery query(m_database);
@@ -99,7 +136,8 @@ bool DatabaseConnection::getUserTemplateByID(const quint64 &userId, QVector<QVec
   if (!query.exec()) {
     qDebug() << "Error: " << query.lastError().text();
     return false;
-  } else {
+  }
+  else {
     qDebug() << "success " << query.lastQuery();
     if (query.next()){
       QByteArray deserializationBuffer = query.value(1).toByteArray();
@@ -110,7 +148,7 @@ bool DatabaseConnection::getUserTemplateByID(const quint64 &userId, QVector<QVec
   return true;
 }
 
-bool DatabaseConnection::getAllUsersFromDb(QMultiMap<QString, QVector<uchar>> *allUsers)
+bool DatabaseConnection::getAllUsersFromDb(QMultiMap<QString, QVector<MINUTIA>> *allUsers)
 {
   if (!allUsers) {
     return false;
@@ -120,12 +158,13 @@ bool DatabaseConnection::getAllUsersFromDb(QMultiMap<QString, QVector<uchar>> *a
   if (!query.exec()) {
     qDebug() << query.lastError().text();
     return false;
-  } else {
+  }
+  else {
     while (query.next()) {
       QString currentUserId = query.value(0).toString();
       QByteArray deserializationBuffer = query.value(1).toByteArray();
       QDataStream deserializationStream(&deserializationBuffer, QIODevice::ReadOnly);
-      QVector<QVector<uchar>> allUserTemplates;
+      QVector<QVector<MINUTIA>> allUserTemplates;
       deserializationStream >> allUserTemplates;
       for (const auto& isoTemplate : allUserTemplates) {
         allUsers->insert(currentUserId, isoTemplate);

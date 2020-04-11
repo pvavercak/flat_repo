@@ -7,12 +7,13 @@ Server::Server(QObject *parent) :
   m_extractor(std::shared_ptr<Extraction>(new Extraction())),
   m_preprocessing(std::shared_ptr<Preprocessing>(new Preprocessing())),
   m_matcher(std::shared_ptr<Matcher>(new Matcher())),
+  m_stored_users{},
   m_expectingSize{-1},
   m_certificate(QString(SRC_DIR) + "/certificates/server.cert.pem"),
   m_key(QString(SRC_DIR) + "/certificates/server.key.pem")
 {
   m_extractor.get()->setCPUOnly(true);
-  m_extractor.get()->setFeatures(true, false, false);
+  m_extractor.get()->setFeatures(false, false, false);
   m_preprocessing.get()->setCPUOnly(true);
 
   qRegisterMetaType<QMap<QString, PREPROCESSING_RESULTS>>("QMap<QString, PREPROCESSING_RESULTS>");
@@ -151,13 +152,13 @@ void Server::deserializeCurrentlyReceivedUser(int* operation)
   }
   else if (1 == op) { //identification
     QImage singleImage = receivedFingersVector.at(0);
-    cv::Mat probeIsoTemplate(singleImage.height(),
+    cv::Mat probeTemplate(singleImage.height(),
                              singleImage.width(),
                              CV_8UC4,
                              (void*)(singleImage.bits()),
                              static_cast<size_t>(singleImage.bytesPerLine()));
 
-    m_preprocessing.get()->loadInput(probeIsoTemplate);
+    m_preprocessing.get()->loadInput(probeTemplate);
   }
   else {
     qDebug() << "Error: Operation not allowed";
@@ -200,11 +201,10 @@ void Server::receiveUserFromClient()
   }
 }
 
-void Server::identifyUser(uchar* user)
+void Server::identifyUser(const QVector<MINUTIA>& user)
 {
-  QMultiMap<QString, QVector<uchar>> users{};
-  m_db.get()->getAllUsersFromDb(&users);
-  m_matcher.get()->identify(user, users);
+  m_db.get()->getAllUsersFromDb(&m_stored_users);
+  m_matcher.get()->identify(user, m_stored_users);
 }
 
 void Server::onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingSingleResult)
@@ -228,31 +228,16 @@ void Server::onPreprocessingErrorSlot(int error)
 
 void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
 {
-  int isoTplSize = HEADER_LENGHT
-                + (FINGER_VIEW_HEADER_LENGTH
-                + (extractionResults.minutiaePredicted.size() * ISO_MINUTIA_LENGTH)
-                + EXTENDED_DATA_BLOCK_LENGTH);
-//  uchar* allocatedUser = (uchar*)malloc(isoTplSize);
-//  memset(allocatedUser, 0, static_cast<size_t>(isoTplSize));
-//  memcpy(allocatedUser, extractionResults.minutiaeISO, static_cast<size_t>(isoTplSize));
-  identifyUser(extractionResults.minutiaeISO);
-  free(extractionResults.minutiaeISO);
+  identifyUser(extractionResults.minutiaePredicted);
 }
 
 void Server::onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS> resultMap)
 {
-  QVector<QVector<uchar>> userIsoTemplates{};
+  QVector<QVector<MINUTIA>> userMinutiae{};
   for(const auto& result : resultMap){
-    int isoTplSize = HEADER_LENGHT
-                  + (FINGER_VIEW_HEADER_LENGTH
-                  + (result.minutiaePredicted.size() * ISO_MINUTIA_LENGTH)
-                  + EXTENDED_DATA_BLOCK_LENGTH);
-
-    QVector<uchar> isoTpl(isoTplSize);
-    memcpy(isoTpl.data(), result.minutiaeISO, static_cast<size_t>(isoTplSize));
-    userIsoTemplates.push_back(isoTpl);
+    userMinutiae.push_back(result.minutiaePredicted);
   }
-  if (!m_db.get()->registerUserToDb(userIsoTemplates)) {
+  if (!m_db.get()->registerUserToDb(userMinutiae)) {
     emit updateLog("Error: User is not registered");
   }
   else {
@@ -264,6 +249,7 @@ void Server::onIdentificationDoneSlot(bool success, QString subject, float score
 {
   if (success) {
     emit updateLog("User is identified: " + subject + " - Best score is " + QString::number(static_cast<double>(score)));
+
   }
   else {
     emit updateLog("User is not in database");

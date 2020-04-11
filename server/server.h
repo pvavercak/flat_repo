@@ -25,12 +25,13 @@ private:
   std::shared_ptr<Extraction> m_extractor;
   std::shared_ptr<Preprocessing> m_preprocessing;
   std::shared_ptr<Matcher> m_matcher;
+  QMultiMap<QString, QVector<MINUTIA>> m_stored_users;
   int m_expectingSize;
   QString m_certificate;
   QString m_key;
   bool checkIp(QString &addr);
   void deserializeCurrentlyReceivedUser(int* operation);
-  void identifyUser(uchar *user);
+  void identifyUser(const QVector<MINUTIA> &user);
 public:
   explicit Server(QObject *parent = nullptr);
   ~Server() override;
