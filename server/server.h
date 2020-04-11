@@ -30,7 +30,7 @@ private:
   QString m_certificate;
   QString m_key;
   bool checkIp(QString &addr);
-  void deserializeCurrentlyReceivedUser(int* operation);
+  void deserializeCurrentlyReceivedUser(int* operation, const qintptr& sd);
   void identifyUser(const QVector<MINUTIA> &user);
 public:
   explicit Server(QObject *parent = nullptr);
@@ -54,6 +54,7 @@ private slots:
   void onMatcherErrorSlot(int errCode);
   void incomingConnection(qintptr socketDescriptor) override;
 signals:
+  void requestingClient(qintptr);
   void updateLog(QString);
   void sendImage(QByteArray);
   void sendImage(QPixmap);
