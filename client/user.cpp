@@ -11,7 +11,13 @@ User::User(const quint8 &fingers_count, const QVector<QImage> &stored_fingers)
 User::User(const User &other)
 {
     this->fingers_count = other.fingers_count;
-    this->stored_fingers = other.stored_fingers;
+  this->stored_fingers = other.stored_fingers;
+}
+
+User::User(User *other)
+{
+  this->fingers_count = other->getFingersCount();
+  this->stored_fingers = other->getStoredFingers();
 }
 
 quint8 User::addFinger(const QImage &fp)
@@ -34,7 +40,12 @@ quint8 User::removeAllFingers()
 
 const quint8 &User::getFingersCount()
 {
-    return this->fingers_count;
+  return this->fingers_count;
+}
+
+const QVector<QImage>& User::getStoredFingers()
+{
+  return this->stored_fingers;
 }
 
 /**

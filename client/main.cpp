@@ -8,7 +8,7 @@
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
-    ClientGUI w;
+    ClientGUI w{};
     w.show();
     return a.exec();
 }

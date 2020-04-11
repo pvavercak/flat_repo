@@ -21,12 +21,14 @@ public:
     User();
     User(const quint8& fingers_count, const QVector<QImage>& stored_fingers);
     User(const User& other);
+    User(User* other);
 
     // below functions return a number of fingerprints that will be stored in user after a function ends
     quint8 addFinger(const QImage& fp);
     quint8 removeFinger(const quint8 index);
     quint8 removeAllFingers();
     const quint8& getFingersCount();
+    const QVector<QImage>& getStoredFingers();
 
     // below functions return no type
     void serializeUser(QByteArray& outBuffer, int operation);
