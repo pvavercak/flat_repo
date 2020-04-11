@@ -34,8 +34,8 @@ Server::Server(QObject *parent) :
           this, SLOT(onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS>)));
   connect(m_extractor.get(), SIGNAL(extractionErrorSignal(int)), this, SLOT(onExtractionErrorSlot(int)));
 
-  connect(m_matcher.get(), SIGNAL(identificationDoneSignal(bool, QString, float)),
-          this, SLOT(onIdentificationDoneSlot(bool, QString, float)));
+  connect(m_matcher.get(), SIGNAL(identificationDoneSignal(bool, QString, float, qintptr)),
+          this, SLOT(onIdentificationDoneSlot(bool, QString, float, qintptr)));
   connect(m_matcher.get(), SIGNAL(matcherErrorSignal(int)), this, SLOT(onMatcherErrorSlot(int)));
 
   m_db.get()->setDb(); // default db configuration
@@ -183,6 +183,7 @@ void Server::receiveUserFromClient()
   else if (m_expectingSize == m_receivedTemplate.size() + incomingBytes){
     m_receivedTemplate.push_back(r);
     int operation{0};
+    qDebug() << "Source socket descriptor -> " << source->socketDescriptor();
     deserializeCurrentlyReceivedUser(&operation, source->socketDescriptor());
     m_expectingSize = -1;
     m_receivedTemplate.clear();
@@ -194,10 +195,10 @@ void Server::receiveUserFromClient()
   }
 }
 
-void Server::identifyUser(const QVector<MINUTIA>& user)
+void Server::identifyUser(const QVector<MINUTIA>& user, const qintptr sd)
 {
   m_db.get()->getAllUsersFromDb(&m_stored_users);
-  m_matcher.get()->identify(user, m_stored_users);
+  m_matcher.get()->identify(user, m_stored_users, sd);
 }
 
 void Server::onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingSingleResult)
@@ -208,7 +209,7 @@ void Server::onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingSingleRe
 
 void Server::onPreprocessingSequenceDoneSlot(QMap<QString, PREPROCESSING_RESULTS> preprocessingResults)
 {
-  m_extractor.get()->loadInput(preprocessingResults);
+  m_extractor.get()->loadInput(preprocessingResults, preprocessingResults.first().requester);
   m_extractor.get()->start();
 }
 
@@ -219,7 +220,7 @@ void Server::onPreprocessingErrorSlot(int error)
 
 void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
 {
-  identifyUser(extractionResults.minutiaePredicted);
+  identifyUser(extractionResults.minutiaePredicted, extractionResults.requester);
 }
 
 void Server::onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS> resultMap)
@@ -236,15 +237,20 @@ void Server::onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS> resu
   }
 }
 
-void Server::onIdentificationDoneSlot(bool success, QString subject, float score)
+void Server::onIdentificationDoneSlot(bool success, QString subject, float score, const qintptr& sd)
 {
-  qDebug() << sender()->objectName();
-  if (success) {
-    emit updateLog("User is identified: " + subject + " - Best score is " + QString::number(static_cast<double>(score)));
 
-  }
-  else {
-    emit updateLog("User is not in database");
+  for (auto& socket : m_sockets){
+    if (sd == socket->socketDescriptor()){
+      if (success) {
+        QString _s{};
+        QTextStream _ts(&_s);
+        _ts << "User was identified with score " << score << " and with id " << subject;
+        socket->write(_s.toLatin1());
+      }
+      else socket->write("User is not registered...");
+      break;
+    }
   }
 }
 

@@ -31,7 +31,7 @@ private:
   QString m_key;
   bool checkIp(QString &addr);
   void deserializeCurrentlyReceivedUser(int* operation, const qintptr& sd);
-  void identifyUser(const QVector<MINUTIA> &user);
+  void identifyUser(const QVector<MINUTIA> &user, const qintptr sd);
 public:
   explicit Server(QObject *parent = nullptr);
   ~Server() override;
@@ -50,7 +50,7 @@ private slots:
   void onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults);
   void onExtractionErrorSlot(int error);
   void onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS> resultMap);
-  void onIdentificationDoneSlot(bool success, QString subject, float score);
+  void onIdentificationDoneSlot(bool success, QString subject, float score, const qintptr &sd);
   void onMatcherErrorSlot(int errCode);
   void incomingConnection(qintptr socketDescriptor) override;
 signals:
