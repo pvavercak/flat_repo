@@ -36,8 +36,10 @@ bool Client::connectionInit(const QString &addr, const quint16 &port)
     connect(m_socket.get(), SIGNAL(encrypted()), this, SLOT(onEncryptedSlot()));
 
     m_socket.get()->connectToHostEncrypted(addr, port);
-    connect(m_socket.get(), SIGNAL(stateChanged(QAbstractSocket::SocketState)), this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
+    connect(m_socket.get(), SIGNAL(stateChanged(QAbstractSocket::SocketState)),
+            this, SLOT(onStateChanged(QAbstractSocket::SocketState)));
     connect(m_socket.get(), SIGNAL(disconnected()), this, SLOT(disconnectedClient()));
+    connect(m_socket.get(), &QSslSocket::readyRead, this, &Client::onServerResponseRead);
   }
   else {
     qDebug() << "[E] : "<< addr << "is in wrong format!";
@@ -182,6 +184,7 @@ void Client::onServerResponseRead()
   if (m_socket) {
     QString _bytes = m_socket.get()->readAll();
     emit updateLog(_bytes);
+    qDebug() << _bytes;
   }
 }
 
@@ -204,6 +207,7 @@ void Client::disconnectedClient()
   if (m_socket) {
     qintptr source_sd = m_socket.get()->socketDescriptor();
     qDebug() << "[I] : Client disconnected (SD: " << source_sd << ")";
+    m_socket.get()->abort();
   }
 }
 

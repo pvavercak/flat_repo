@@ -32,7 +32,6 @@ public:
 
     // below functions return no type
     void serializeUser(QByteArray& outBuffer, int operation);
-    void deserializeUser(const QByteArray& inBuffer, User* newUser);
 
     // below functions return misc types
     QImage getFingerOnIndex(const quint8 index); // returns empty vector if index is not valid
