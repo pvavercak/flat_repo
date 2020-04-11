@@ -33,7 +33,7 @@ private:
   QImage readFingerFromImage(const QString& imagePath);
   quint8 readFingersFromDirectory(const QFileInfo &fileInfo, QVector<QImage> *outImages);
   bool isImageFormatSupported(const QString& format);
-  void CHECK_ERROR(const UFS_STATUS& err);
+  void UFS_CHECK_ERROR(const UFS_STATUS& err);
   bool sendProbeUser(int operation);
 
 public:

@@ -138,7 +138,7 @@ p, li { white-space: pre-wrap; }
          <item>
           <widget class="QLineEdit" name="pathToFingerImage">
            <property name="text">
-            <string>/home/pva/Documents/my_fingers_bmp/LI.bmp</string>
+            <string>/home/pva/Documents/my_fingers_bmp</string>
            </property>
           </widget>
          </item>

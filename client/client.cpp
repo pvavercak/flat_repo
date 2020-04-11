@@ -6,15 +6,15 @@ Client::Client(QObject *parent) :
   m_user(std::make_shared<User>(new User()))
 {
   UFS_STATUS err = UFS_Init();
-  CHECK_ERROR(err);
+  UFS_CHECK_ERROR(err);
   err = UFS_GetScannerHandle(0, &m_scanner);
-  CHECK_ERROR(err);
+  UFS_CHECK_ERROR(err);
 }
 
 Client::~Client()
 {
   UFS_STATUS err = UFS_Uninit();
-  CHECK_ERROR(err);
+  UFS_CHECK_ERROR(err);
 }
 
 bool Client::connectionInit(const QString &addr, const quint16 &port)
@@ -52,7 +52,7 @@ bool Client::connectionInit(const QString &addr, const quint16 &port)
     }
 
     if (m_socket.get()->isEncrypted()) {
-      qDebug() << "[U] : Encrypted connection is set";
+      qDebug() << "[I] : Encrypted connection is set";
     }
   }
 
@@ -142,16 +142,16 @@ bool Client::sendProbeUser(int operation)
     return false;
   }
 
-  qDebug() << "[U] : User has been sent";
+  qDebug() << "[I] : User has been sent";
   return true;
 }
 
 bool Client::isImageFormatSupported(const QString &format)
 {
-  QVector<QString> _supported_formats = {"bmp",
-                                         "gif",
-                                         "jpg",
-                                         "png"};
+  QVector<QString> _supported_formats = { "bmp",
+                                          "gif",
+                                          "jpg",
+                                          "png"};
   const bool supported = _supported_formats.contains(format);
   return supported;
 }
@@ -179,10 +179,10 @@ void Client::disconnectFromHost()
 
 void Client::onServerResponseRead()
 {
-  std::unique_ptr<QSslSocket> source =
-            std::make_unique<QSslSocket>(qobject_cast<QSslSocket*>(sender()));
-  QString _bytes = source.get()->readAll();
-  emit updateLog(_bytes);
+  if (m_socket) {
+    QString _bytes = m_socket.get()->readAll();
+    emit updateLog(_bytes);
+  }
 }
 
 void Client::onConnectedSlot()
@@ -190,7 +190,7 @@ void Client::onConnectedSlot()
   if (m_socket) {
     QString pa = m_socket.get()->peerAddress().toString();
     quint16 pp = m_socket.get()->peerPort();
-    qDebug() << "Connected to " << pa <<  ":" << pp;
+    qDebug() << "[I] : Connected to " << pa <<  ":" << pp;
   }
 }
 
@@ -201,43 +201,36 @@ void Client::onStateChanged(QAbstractSocket::SocketState state)
 
 void Client::disconnectedClient()
 {
-  std::unique_ptr<QSslSocket> source =
-      std::make_unique<QSslSocket>(qobject_cast<QSslSocket*>(sender()));
-  qintptr source_sd = source.get()->socketDescriptor();
-  emit updateLog(
-        "Status: Client disconnected [ SD: "
-        + QString::number(source_sd)
-        + " ]");
+  if (m_socket) {
+    qintptr source_sd = m_socket.get()->socketDescriptor();
+    qDebug() << "[I] : Client disconnected (SD: " << source_sd << ")";
+  }
 }
 
 void Client::encryptedSlot()
 {
-  qDebug() << "[U] : Connection is encrypted";
+  qDebug() << "[I] : Connection is encrypted";
 }
 
 void Client::onSslErrorSlot(const QList<QSslError> &errorList)
 {
   qintptr source_sd = m_socket.get()->socketDescriptor();
-  emit updateLog(
-      "Warning: Ignoring SSL Errors [ SD: "
-      +QString::number(source_sd)
-      +" ]");
-
+  qDebug() << "[W] : Ignoring SSL Errors (SD " << source_sd << ")";
   m_socket.get()->ignoreSslErrors(errorList);
 }
 
 QImage Client::readFingerFromScanner()
 {
   UFS_STATUS err = UFS_ClearCaptureImageBuffer(m_scanner);
-  CHECK_ERROR(err);
+  UFS_CHECK_ERROR(err);
   err = UFS_CaptureSingleImage(m_scanner);
-  CHECK_ERROR(err);
+  UFS_CHECK_ERROR(err);
   int width{0}, height{0}, resolution{0};
   err = UFS_GetCaptureImageBufferInfo(m_scanner, &width, &height, &resolution);
-  CHECK_ERROR(err);
+  UFS_CHECK_ERROR(err);
   QVector<uchar> bufFinger(width * height);
   err = UFS_GetCaptureImageBuffer(m_scanner, bufFinger.data());
-  CHECK_ERROR(err);
+  UFS_CHECK_ERROR(err);
   QImage outFingerImage(bufFinger.data(), width, height, QImage::Format_Grayscale8);
   outFingerImage = outFingerImage.convertToFormat(QImage::Format_ARGB32);
   return outFingerImage;
@@ -263,31 +256,33 @@ QImage Client::readFingerFromImage(const QString& imagePath)
   }
 
   QImage image(imagePath, imageFormat.toStdString().c_str());
-  image = image.convertToFormat(QImage::Format_ARGB32);
+  outFingerImage = image.convertToFormat(QImage::Format_ARGB32);
 
   return outFingerImage;
 }
 
 quint8 Client::readFingersFromDirectory(const QFileInfo& fileInfo, QVector<QImage>* outImages)
 {
-  QStringList imgDir = fileInfo.absoluteDir().entryList(QStringList()
-                                                        << "*.bmp" << "*.BMP"
+  QString absPath = fileInfo.filePath();
+  QDir imgDir(absPath);
+  QStringList dirList = imgDir.entryList(QStringList()  << "*.bmp" << "*.BMP"
                                                         << "*.gif" << "*.GIF"
                                                         << "*.jpg" << "*.JPG"
                                                         << "*.png" << "*.PNG",
                                                         QDir::Files);
-  for (const auto& image : imgDir) {
-    QImage loadedImage = readFingerFromImage(image);
+  for (const auto& image : dirList) {
+    const QString pathBuilder = absPath + "/" + image;
+    QImage loadedImage = readFingerFromImage(pathBuilder);
     outImages->push_back(loadedImage);
   }
-  const  quint8 imgCount = static_cast<quint8>( imgDir.size() );
+  const  quint8 imgCount = static_cast<quint8>( dirList.size() );
   return imgCount;
 
 }
 
 void Client::onEncryptedSlot()
 {
-  qDebug() << "[U] : established encrypted connection";
+  qDebug() << "[I] : Established encrypted connection";
 }
 
 bool Client::checkIp(const QString &receivedIp)
@@ -302,14 +297,13 @@ bool Client::checkIp(const QString &receivedIp)
   return false;
 }
 
-void Client::CHECK_ERROR(const UFS_STATUS& err)
+void Client::UFS_CHECK_ERROR(const UFS_STATUS& err)
 {
   if(UFS_OK != err){
     char *message{};
     UFS_STATUS _err = UFS_GetErrorString(err, message);
-    CHECK_ERROR(_err);
+    UFS_CHECK_ERROR(_err);
     qDebug() << QString(message);
     exit(err);
   }
 }
-
