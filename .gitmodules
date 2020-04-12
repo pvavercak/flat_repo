@@ -7,3 +7,9 @@
 [submodule "preprocessor"]
 	path = preprocessor
 	url = git@github.com:pvavercak/preprocessor.git
+[submodule "client_cli"]
+	path = client_cli
+	url = git@github.com:pvavercak/client_cli.git
+[submodule "server_cli"]
+	path = server_cli
+	url = git@github.com:pvavercak/server_cli.git
