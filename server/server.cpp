@@ -7,12 +7,13 @@ Server::Server(QObject *parent) :
   m_extractor(std::shared_ptr<Extraction>(new Extraction())),
   m_preprocessing(std::shared_ptr<Preprocessing>(new Preprocessing())),
   m_matcher(std::shared_ptr<Matcher>(new Matcher())),
+  m_stored_users{},
   m_expectingSize{-1},
   m_certificate(QString(SRC_DIR) + "/certificates/server.cert.pem"),
   m_key(QString(SRC_DIR) + "/certificates/server.key.pem")
 {
   m_extractor.get()->setCPUOnly(true);
-  m_extractor.get()->setFeatures(true, false, false);
+  m_extractor.get()->setFeatures(false, false, false);
   m_preprocessing.get()->setCPUOnly(true);
 
   qRegisterMetaType<QMap<QString, PREPROCESSING_RESULTS>>("QMap<QString, PREPROCESSING_RESULTS>");
@@ -33,8 +34,8 @@ Server::Server(QObject *parent) :
           this, SLOT(onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS>)));
   connect(m_extractor.get(), SIGNAL(extractionErrorSignal(int)), this, SLOT(onExtractionErrorSlot(int)));
 
-  connect(m_matcher.get(), SIGNAL(identificationDoneSignal(bool, QString, float)),
-          this, SLOT(onIdentificationDoneSlot(bool, QString, float)));
+  connect(m_matcher.get(), SIGNAL(identificationDoneSignal(bool, QString, float, qintptr)),
+          this, SLOT(onIdentificationDoneSlot(bool, QString, float, qintptr)));
   connect(m_matcher.get(), SIGNAL(matcherErrorSignal(int)), this, SLOT(onMatcherErrorSlot(int)));
 
   m_db.get()->setDb(); // default db configuration
@@ -64,12 +65,12 @@ void Server::incomingConnection(qintptr socketDescriptor)
     newSocket->startServerEncryption();
     m_sockets.push_back(newSocket);
     emit updateClientList(m_sockets);
-    emit updateLog("Status: Client connected");
+    qDebug() << "[I] : New connection";
   }
   else {
-    emit updateLog("Error: Could not bind an encrypted connection with a server");
+    qDebug() << "[E] : Could not bind an encrypted connection with a server";
     delete newSocket;
-  }
+    }
 }
 
 bool Server::checkIp(QString &receivedIp)
@@ -90,17 +91,17 @@ bool Server::checkIp(QString &receivedIp)
 void Server::initialize(QString &addr, quint16 &port)
 {
   if(!checkIp(addr)) {
-    emit updateLog("Error: Wrong IP address");
+    qDebug() << "[E] : Wrong IP address";
     return;
   }
   if(this->isListening()) {
-    emit updateLog("Warning: Listening state - skipping");
+    qDebug() << "[W] : Listening state - skipping";
   }
   else if (this->listen(QHostAddress(addr), port)) {
-    emit updateLog("Message: Waiting for a connection");
+    qDebug() << "[I] : Waiting for a connection";
   }
   else {
-    emit updateLog("Error: Could not start a server");
+    qDebug() << "[E] : Could not start a server";
   }
 }
 
@@ -108,10 +109,10 @@ void Server::terminate()
 {
   if (this->isListening()){
     this->close();
-    updateLog("Message: Server terminated");
+    qDebug() << "[I] : Server terminated";
   }
   else {
-    updateLog("Error: Server not running");
+    qDebug() << "[E] : Server not running";
     return;
   }
 
@@ -121,7 +122,7 @@ void Server::terminate()
   m_sockets.clear();
 }
 
-void Server::deserializeCurrentlyReceivedUser(int* operation)
+void Server::deserializeCurrentlyReceivedUser(int* operation, const qintptr& sd)
 {
   QByteArray inputBytes = m_receivedTemplate;
   QDataStream tempStream(inputBytes);
@@ -131,8 +132,8 @@ void Server::deserializeCurrentlyReceivedUser(int* operation)
   tempStream >> sz >> op >> fpcount >> receivedFingersVector;
   *operation = op;
 
-  if (0 == receivedFingersVector.size()){
-    emit updateLog("Warning: probe user is empty, skipping all operations");
+  if (0 == receivedFingersVector.size()) {
+    qDebug() << "[W] : probe user is empty, skipping all operations";
     return;
   }
 
@@ -147,20 +148,20 @@ void Server::deserializeCurrentlyReceivedUser(int* operation)
       matVector.push_back(probeIsoTemplate);
     }
 
-    m_preprocessing.get()->loadInput(matVector);
+    m_preprocessing.get()->loadInput(matVector, sd);
   }
   else if (1 == op) { //identification
     QImage singleImage = receivedFingersVector.at(0);
-    cv::Mat probeIsoTemplate(singleImage.height(),
-                             singleImage.width(),
-                             CV_8UC4,
-                             (void*)(singleImage.bits()),
-                             static_cast<size_t>(singleImage.bytesPerLine()));
+    cv::Mat probeTemplate(singleImage.height(),
+                          singleImage.width(),
+                          CV_8UC4,
+                          (void*)(singleImage.bits()),
+                          static_cast<size_t>(singleImage.bytesPerLine()));
 
-    m_preprocessing.get()->loadInput(probeIsoTemplate);
+    m_preprocessing.get()->loadInput(probeTemplate, sd);
   }
   else {
-    qDebug() << "Error: Operation not allowed";
+    qDebug() << "[E] : Operation not defined";
     return;
   }
 
@@ -182,134 +183,118 @@ void Server::receiveUserFromClient()
   else if (m_expectingSize == m_receivedTemplate.size() + incomingBytes){
     m_receivedTemplate.push_back(r);
     int operation{0};
-    deserializeCurrentlyReceivedUser(&operation);
+    qDebug() << "Source socket descriptor -> " << source->socketDescriptor();
+    deserializeCurrentlyReceivedUser(&operation, source->socketDescriptor());
     m_expectingSize = -1;
     m_receivedTemplate.clear();
   }
   else {
     m_expectingSize = -1;
     m_receivedTemplate.clear();
-    emit updateLog("Error: Something went wrong when receiving user from client.");
-    QTextStream streamErrorMsg;
-    streamErrorMsg << "Error: Something went wrong when receiving user from client:\n";
-    streamErrorMsg << "\tExpected size of user: " << m_expectingSize << "\n";
-    streamErrorMsg << "\tActual size: " << r.size();
-    QString errorMsg;
-    streamErrorMsg >> errorMsg;
-    emit updateLog(errorMsg);
+    qDebug() << "[E] : Something went wrong when receiving user from client.";
   }
 }
 
-void Server::identifyUser(uchar* user)
+void Server::identifyUser(const QVector<MINUTIA>& user, const qintptr sd)
 {
-  QMultiMap<QString, QVector<uchar>> users{};
-  m_db.get()->getAllUsersFromDb(&users);
-  m_matcher.get()->identify(user, users);
+  m_db.get()->getAllUsersFromDb(&m_stored_users);
+  m_matcher.get()->identify(user, m_stored_users, sd);
 }
 
 void Server::onPreprocessingDoneSlot(PREPROCESSING_RESULTS preprocessingSingleResult)
 {
-  emit updateLog("Status: Preprocessing done");
   m_extractor.get()->loadInput(preprocessingSingleResult);
   m_extractor.get()->start();
 }
 
 void Server::onPreprocessingSequenceDoneSlot(QMap<QString, PREPROCESSING_RESULTS> preprocessingResults)
 {
-  emit updateLog("Status: preprocessing done");
-  m_extractor.get()->loadInput(preprocessingResults);
+  m_extractor.get()->loadInput(preprocessingResults, preprocessingResults.first().requester);
   m_extractor.get()->start();
 }
 
 void Server::onPreprocessingErrorSlot(int error)
 {
-  emit updateLog("Error: Preprocessor returned " + QString::number(error));
+  qDebug() << "[E] : Preprocessing error " << error;
 }
 
 void Server::onExtractionDoneSlot(EXTRACTION_RESULTS extractionResults)
 {
-  int isoTplSize = HEADER_LENGHT
-                + (FINGER_VIEW_HEADER_LENGTH
-                + (extractionResults.minutiaePredicted.size() * ISO_MINUTIA_LENGTH)
-                + EXTENDED_DATA_BLOCK_LENGTH);
-//  uchar* allocatedUser = (uchar*)malloc(isoTplSize);
-//  memset(allocatedUser, 0, static_cast<size_t>(isoTplSize));
-//  memcpy(allocatedUser, extractionResults.minutiaeISO, static_cast<size_t>(isoTplSize));
-  identifyUser(extractionResults.minutiaeISO);
-  free(extractionResults.minutiaeISO);
+  identifyUser(extractionResults.minutiaePredicted, extractionResults.requester);
 }
 
 void Server::onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS> resultMap)
 {
-  QVector<QVector<uchar>> userIsoTemplates{};
+  QVector<QVector<MINUTIA>> userMinutiae{};
   for(const auto& result : resultMap){
-    int isoTplSize = HEADER_LENGHT
-                  + (FINGER_VIEW_HEADER_LENGTH
-                  + (result.minutiaePredicted.size() * ISO_MINUTIA_LENGTH)
-                  + EXTENDED_DATA_BLOCK_LENGTH);
-
-    QVector<uchar> isoTpl(isoTplSize);
-    memcpy(isoTpl.data(), result.minutiaeISO, static_cast<size_t>(isoTplSize));
-    userIsoTemplates.push_back(isoTpl);
+    userMinutiae.push_back(result.minutiaePredicted);
   }
-  if (!m_db.get()->registerUserToDb(userIsoTemplates)) {
-    emit updateLog("Error: User is not registered");
+  if (!m_db.get()->registerUserToDb(userMinutiae)) {
+    qDebug() << "[E] : User is not registered";
   }
   else {
-    emit updateLog("Succes: User is registered");
+    qDebug() << "[I] : User is registered";
   }
 }
 
-void Server::onIdentificationDoneSlot(bool success, QString subject, float score)
+void Server::onIdentificationDoneSlot(bool success, QString subject, float score, const qintptr& sd)
 {
-  if (success) {
-    emit updateLog("User is identified: " + subject + " - Best score is " + QString::number(static_cast<double>(score)));
-  }
-  else {
-    emit updateLog("User is not in database");
+
+  for (auto& socket : m_sockets){
+    if (sd == socket->socketDescriptor()){
+      if (success) {
+        QString _s{};
+        QTextStream _ts(&_s);
+        _ts << "User was identified with score " << score << " and with id " << subject;
+        socket->write(_s.toLatin1());
+      }
+      else socket->write("User is not registered...");
+      break;
+    }
   }
 }
 
 void Server::onMatcherErrorSlot(int errCode)
 {
-  emit updateLog("Error: Identification failed with code " + QString::number(errCode));
+  qDebug() << "[E] : Identification error " << errCode;
 }
 
 void Server::onExtractionErrorSlot(int error)
 {
-  emit updateLog("Error: Extractor returned " + QString::number(error));
+  qDebug() << "[E] : Extraction error " << error;
 }
 
 void Server::disconnectedClientSlot()
 {
-  emit updateLog("Status: Client disconnected");
+
   QSslSocket *disconnectedSocket = qobject_cast<QSslSocket*>(sender());
   m_sockets.removeOne(disconnectedSocket);
+  emit updateClientList(m_sockets);
+  qDebug() << "[I] : Client " << disconnectedSocket->socketDescriptor() << " disconnected";
 }
 
 void Server::onStateChanged(QAbstractSocket::SocketState state)
 {
-  emit updateLog("Status: " + QString(state));
+  qDebug() << state;
 }
 
 void Server::onErrorSlot(QAbstractSocket::SocketError error)
 {
-  emit updateLog("Error: " + QString(static_cast<unsigned char>(error)));
+  qDebug() << error;
 }
 
 void Server::onEncryptedSlot()
 {
-  if (qobject_cast<QSslSocket*>(sender())->isEncrypted()){
-    updateLog("Status: Encrypted connection established [SD: " + QString::number(qobject_cast<QSslSocket*>(sender())->socketDescriptor()) + "]");
+  QSslSocket *source = qobject_cast<QSslSocket*>(sender());
+  if (source->isEncrypted()) {
+    qDebug() << "[I] : Encrypted connection established (SD " << source->socketDescriptor() << ")";
   }
 }
 
 void Server::onSslErrorSlot(const QList<QSslError> &errorList)
 {
   for(const QSslError &e : errorList){
-    qDebug() << "Ssl error: " << e.errorString();
+    qDebug() << "[I] Ignored SSL error: " << e.errorString();
     qobject_cast<QSslSocket*>(sender())->ignoreSslErrors(errorList);
   }
-  emit updateLog("Status: Ignoring SSL errors [SD: " +
-                  QString::number(qobject_cast<QSslSocket*>(sender())->socketDescriptor()) + "]");
 }

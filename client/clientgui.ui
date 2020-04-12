@@ -136,7 +136,11 @@ p, li { white-space: pre-wrap; }
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="pathToFingerImage"/>
+          <widget class="QLineEdit" name="pathToFingerImage">
+           <property name="text">
+            <string>/home/pva/Documents/my_fingers_bmp</string>
+           </property>
+          </widget>
          </item>
          <item>
           <widget class="QPushButton" name="addFromFileButton">

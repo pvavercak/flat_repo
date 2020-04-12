@@ -20,8 +20,6 @@ private slots:
   void on_start_server_pressed();
   void on_terminate_pressed();
   void updateClientListSlot(QVector<QSslSocket*> sokets);
-  void on_dbTestButton_pressed();
-  void on_dbGetButton_pressed();
 private:
   std::shared_ptr<Ui::Server> m_ui;
   std::shared_ptr<QTextEdit> m_console;

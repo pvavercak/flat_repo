@@ -4,8 +4,8 @@
 #include <QFile>
 ClientGUI::ClientGUI(QWidget *parent) :
     QMainWindow(parent),
-    m_client(std::shared_ptr<Client>(new Client())),
-    m_ui(new Ui::ClientGUI)
+    m_client(std::unique_ptr<Client>(new Client())),
+    m_ui(new Ui::ClientGUI())
 {
     m_ui->setupUi(this);
     connect(m_client.get(), SIGNAL(updateLog(QString)), m_ui->clientconsole, SLOT(append(QString)));
@@ -13,26 +13,7 @@ ClientGUI::ClientGUI(QWidget *parent) :
 
 ClientGUI::~ClientGUI()
 {
-}
-
-void ClientGUI::attemptConnection()
-{
-
-}
-
-void ClientGUI::connectedToServer()
-{
-    qDebug() << "Connected to server";
-}
-
-void ClientGUI::disconnectedFromServer()
-{
-    qDebug() << "Disconnected from server";
-}
-
-void ClientGUI::error(QAbstractSocket::SocketError socketError)
-{
-    qDebug() << "Error: " << socketError;
+  delete m_ui;
 }
 
 void ClientGUI::on_scan_pressed()
@@ -74,5 +55,6 @@ void ClientGUI::on_identifyButton_pressed()
 
 void ClientGUI::on_addFromFileButton_pressed()
 {
-    m_client.get()->sendBadMessage();
+  const QString imagePath = m_ui->pathToFingerImage->text();
+  m_client.get()->addFingerFromFile(imagePath);
 }
