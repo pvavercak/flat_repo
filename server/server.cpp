@@ -183,7 +183,6 @@ void Server::receiveUserFromClient()
   else if (m_expectingSize == m_receivedTemplate.size() + incomingBytes){
     m_receivedTemplate.push_back(r);
     int operation{0};
-    qDebug() << "Source socket descriptor -> " << source->socketDescriptor();
     deserializeCurrentlyReceivedUser(&operation, source->socketDescriptor());
     m_expectingSize = -1;
     m_receivedTemplate.clear();
@@ -229,11 +228,18 @@ void Server::onExtractionSequenceDoneSlot(QMap<QString, EXTRACTION_RESULTS> resu
   for(const auto& result : resultMap){
     userMinutiae.push_back(result.minutiaePredicted);
   }
-  if (!m_db.get()->registerUserToDb(userMinutiae)) {
-    qDebug() << "[E] : User is not registered";
-  }
-  else {
-    qDebug() << "[I] : User is registered";
+  qintptr _sd = resultMap.first().requester;
+  for (const auto& socket: m_sockets) {
+    if (_sd == socket->socketDescriptor()) {
+      QString _m{};
+      if (!m_db.get()->registerUserToDb(userMinutiae)){
+        _m = "[E] : User is not registered";
+      }
+      else {
+        _m = "[I] : User is registered";
+      }
+      socket->write(_m.toLatin1());
+    }
   }
 }
 
@@ -248,7 +254,7 @@ void Server::onIdentificationDoneSlot(bool success, QString subject, float score
         _ts << "User was identified with score " << score << " and with id " << subject;
         socket->write(_s.toLatin1());
       }
-      else socket->write("User is not registered...");
+      else socket->write("User was not identified...");
       break;
     }
   }
