@@ -15,6 +15,7 @@ Client::~Client()
 {
   UFS_STATUS err = UFS_Uninit();
   UFS_CHECK_ERROR(err);
+  disconnectFromHost();
 }
 
 bool Client::connectionInit(const QString &addr, const quint16 &port)
@@ -106,7 +107,7 @@ bool Client::addFingerFromFile(const QString &imagePath)
         return false;
       }
   }
-  else {
+  else if (file_info.isFile()){
     QImage f = readFingerFromImage(imagePath);
     if (f.isNull()) {
       return false;
